@@ -79,7 +79,7 @@ if __name__ == "__main__":
         custom_points.append({
             "x": A["x"] + t * (B["x"] - A["x"]),
             "y": A["y"] + t * (B["y"] - A["y"]),
-            "z": A["z"] + t * (B["z"] - A["z"]) + (-1)**i * 10,
+            "z": A["z"] + t * (B["z"] - A["z"]), # + (-1)**i * 10,
             "h_speed": 20,
             "v_speed": 8,
         })

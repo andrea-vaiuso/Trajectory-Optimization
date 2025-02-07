@@ -98,30 +98,37 @@ class Drone:
 
         self.target_history = []
         
-    def update_rpms(self, target, dt):
-        # Calcola l'errore verticale
+    def calculate_acceleration_factors(self, target):
+        # Vertical factors
         vertical_error = target[2] - self.position[2]
-        vertical_decel_distance = 20.0
-        vertical_factor = min(abs(vertical_error) / vertical_decel_distance, 1.0)
+        last_vertical_error = self.target_history[-1][2] - self.position[2]
 
-        v_speed_factor = self.vertical_speed / self.max_vertical_speed
-        vertical_component = self.hover_rpm + (self.max_RPM - self.hover_rpm) * vertical_factor * v_speed_factor * np.sign(vertical_error)
+        vertical_decel_factor = min(abs(vertical_error) / self.vertical_decel_distance , 1.0)
+        vertical_accel_factor = min((abs(last_vertical_error) + 1) / self.vertical_accel_distance, 1.0)
+        vertical_total_acceleration_factor = vertical_decel_factor * vertical_accel_factor
 
-        # Componente orizzontale (considerando la velocità)
+        # Horizontal factors
         horizontal_distance = np.linalg.norm(target[:2] - self.position[:2])
-        horizontal_decel_distance = 20.0
+        last_horizontal_distance = np.linalg.norm(self.target_history[-1][:2] - self.position[:2])
 
-        horizontal_factor = min(horizontal_distance / horizontal_decel_distance, 1.0)
+        horizontal_decel_factor = min(horizontal_distance / self.horiz_decel_distance, 1.0)
+        horizontal_accel_factor = min((last_horizontal_distance + 1) / self.horiz_accel_distance, 1.0)
+        horizontal_total_acceleration_factor = horizontal_decel_factor * horizontal_accel_factor
+
+        return vertical_total_acceleration_factor, horizontal_total_acceleration_factor
+
+    def update_rpms(self, target, dt, vertical_total_acceleration_factor, horizontal_total_acceleration_factor):
+        v_speed_factor = self.vertical_speed / self.max_vertical_speed
+        vertical_component = self.hover_rpm + (self.max_RPM - self.hover_rpm) * vertical_total_acceleration_factor * v_speed_factor * np.sign(target[2] - self.position[2])
+
         h_speed_factor = self.horizontal_speed / self.max_horizontal_speed
-        horizontal_component = (self.max_RPM - self.min_RPM) * horizontal_factor * h_speed_factor
+        horizontal_component = (self.max_RPM - self.min_RPM) * horizontal_total_acceleration_factor * h_speed_factor
 
-        # Somma le due componenti con il valore di hover per ottenere il target RPM medio
         desired_avg_rpm = vertical_component + horizontal_component * 0.13
         desired_avg_rpm = np.clip(desired_avg_rpm, self.min_RPM, self.max_RPM)
 
-        # Aggiornamento degli RPM con tasso di variazione limitato
-        rpm_update_gain = 50  # Regola questo guadagno se serve
-        max_rpm_change = 600 * dt  # Limite per evitare variazioni troppo brusche
+        rpm_update_gain = 50
+        max_rpm_change = 600 * dt
 
         for i in range(4):
             error = desired_avg_rpm - self.rpm_values[i]
@@ -130,51 +137,28 @@ class Drone:
             self.rpm_values[i] += rpm_adjustment
             self.rpm_values[i] = np.clip(self.rpm_values[i], self.min_RPM, self.max_RPM)
     
-    
-    def update_physics(self, target, dt, distance_error_threshold=1):
-        # MOVIMENTO ORIZZONTALE
+    def update_physics(self, target, dt, vertical_total_acceleration_factor, horizontal_total_acceleration_factor, distance_error_threshold=1):
         horizontal_target = np.array([target[0], target[1]])
         horizontal_position = np.array([self.position[0], self.position[1]])
         horizontal_direction = horizontal_target - horizontal_position
         horizontal_distance = np.linalg.norm(horizontal_direction)
 
-        last_horizontal_target = np.array([self.target_history[-1][0], self.target_history[-1][1]])
-        last_horizontal_direction = last_horizontal_target - horizontal_position
-        last_horizontal_distance = np.linalg.norm(last_horizontal_direction)
-
-        horizontal_decel_factor = min(horizontal_distance / self.horiz_decel_distance, 1.0)
-        hotizontal_accel_factor = min((last_horizontal_distance + distance_error_threshold) / self.horiz_accel_distance, 1.0)
-        
-        hotizontal_total_acceleration_factor = horizontal_decel_factor * hotizontal_accel_factor
-
-        horizontal_velocity = self.horizontal_speed * hotizontal_total_acceleration_factor * (horizontal_direction / horizontal_distance)
+        horizontal_velocity = self.horizontal_speed * horizontal_total_acceleration_factor * (horizontal_direction / horizontal_distance)
         horizontal_step = horizontal_velocity * dt
         if np.linalg.norm(horizontal_step) > horizontal_distance:
             horizontal_position = horizontal_target.copy()
         else:
             horizontal_position += horizontal_step
 
-            
         self.position[0] = horizontal_position[0]
         self.position[1] = horizontal_position[1]
         self.velocity[0] = horizontal_velocity[0]
         self.velocity[1] = horizontal_velocity[1]
         
-        # MOVIMENTO VERTICALE
         vertical_error = target[2] - self.position[2]
-        last_vertical_error = self.target_history[-1][2] - self.position[2]
-
-       
-
-        vertical_decel_factor = min(abs(vertical_error) / self.vertical_decel_distance , 1.0)
-        vertical_accel_factor = min((abs(last_vertical_error) + distance_error_threshold) / self.vertical_accel_distance, 1.0)
-
-        vertical_total_acceleration_factor = vertical_decel_factor * vertical_accel_factor
-        # Velocità verticale desiderata: costante (massima se lontano, ridotta quando ci si avvicina)
         desired_vertical_velocity = self.vertical_speed * vertical_total_acceleration_factor * np.sign(vertical_error)
         vertical_step = desired_vertical_velocity * dt
         
-        # Se il passo supera l'errore residuo, arriva esattamente a target
         if abs(vertical_step) > abs(vertical_error):
             self.position[2] = target[2]
             self.velocity[2] = 0
@@ -182,9 +166,7 @@ class Drone:
             self.position[2] += vertical_step
             self.velocity[2] = desired_vertical_velocity
         
-        # Assicurarsi di non scendere sotto terra
         self.position[2] = max(self.position[2], 0)
-    
     
     def update_control(self, target, dt):
         target_position = target[:3]
@@ -192,13 +174,17 @@ class Drone:
         target_v_speed = target[4]
         self.horizontal_speed = target_h_speed
         self.vertical_speed = target_v_speed
-        self.update_rpms(target_position, dt)
+
+        vertical_total_acceleration_factor, horizontal_total_acceleration_factor = self.calculate_acceleration_factors(target_position)
+        self.update_rpms(target_position, dt, vertical_total_acceleration_factor, horizontal_total_acceleration_factor)
+        
         direction = target_position - self.position
         horizontal_distance = math.sqrt(direction[0]**2 + direction[1]**2)
         if np.linalg.norm(direction) > 0:
             self.yaw = math.atan2(direction[1], direction[0])
             self.pitch = math.atan2(-direction[2], horizontal_distance)
-        self.update_physics(target_position, dt)
+        
+        self.update_physics(target_position, dt, vertical_total_acceleration_factor, horizontal_total_acceleration_factor)
         return self.pitch, self.yaw, self.rpm_values.copy(), self.position.copy(), self.velocity.copy()
 
 
