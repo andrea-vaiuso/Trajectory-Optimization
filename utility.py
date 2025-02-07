@@ -37,7 +37,7 @@ def showPlot(trajectory, A, B, all_targets, world, grid_size, max_world_size, lo
 
     ax.set_xlim(0, max_world_size)
     ax.set_ylim(0, max_world_size)
-    ax.set_zlim(0, max(z_data)*1.1)
+    ax.set_zlim(0, max_world_size)
     ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_zlabel('Z (m)')

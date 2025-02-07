@@ -236,6 +236,8 @@ class Simulation:
         }
 
         total_avg_spl = []
+        total_avg_noise_costs = []
+        total_avg_altitude_costs = []
 
         while targets:
             target = targets[0]
@@ -244,9 +246,13 @@ class Simulation:
             while horizontal_err > horizontal_threshold or vertical_err > vertical_threshold:
                 previous_position = self.drone.position.copy()
                 pitch, yaw, rpms, pos, vel = self.drone.update_control(target, dt)
+                noise_cost = 0
+                altitude_cost = 0
                 if self.noise_model is not None and int(t_elapsed % noise_model_update_frequency) == 0:
                     ground_areas, ground_parameters = self.world.get_areas_in_circle(int(pos[0]), int(pos[1]), 1, noise_annoyance_radius)
                     average_spl = 0
+                    average_noise_cost = 0
+                    average_altitude_cost = 0
                     for i in range(len(ground_areas)):
                         x, y, _ = ground_areas[i]
                         # Compute distance between drone and area center
@@ -258,14 +264,25 @@ class Simulation:
                         # Set SWL depending on drone RPM
                         swl = swl_ref_rpm + 10 * np.log10(rpms[0] / self.drone.hover_rpm)
                         # Calculate sound pressure level
-                        spl = swl - 10 * np.log10(4*np.pi*distance**2)
+                        spl = swl - abs(10 * np.log10(1/4*np.pi*distance**2))
                         average_spl += spl
                         #print(spl)
                         # Check if area rules are violated
                         if ground_parameters[i] != {}:
-                            pass
+                            average_noise_cost += spl * ground_parameters[i]["noise_penalty"]
+                            average_altitude_cost += max(pos[2] - ground_parameters[i]["max_altitude"], 0)
+                            average_altitude_cost += max(ground_parameters[i]["min_altitude"] - pos[2], 0)  
+
+                    average_noise_cost /= len(ground_areas)
+                    average_altitude_cost /= len(ground_areas)
                     average_spl /= len(ground_areas)
                     total_avg_spl.append(average_spl)
+                    total_avg_noise_costs.append(average_noise_cost)
+                    total_avg_altitude_costs.append(average_altitude_cost)
+                
+                noise_cost += np.average(total_avg_noise_costs) * noise_model_update_frequency
+                altitude_cost += np.average(total_avg_altitude_costs) * noise_model_update_frequency
+
                 step_distance = np.linalg.norm(self.drone.position - previous_position)
                 total_distance += step_distance
                 trajectory.append(self.drone.position.copy())
@@ -284,11 +301,11 @@ class Simulation:
             
         
         elapsed = time.time() - start_time
-        costs["distance"] += total_distance * distance_cost_gain
-        costs["time"] += t_elapsed * time_cost_gain
+        costs["distance"] += total_distance ** 1.5 * distance_cost_gain
+        costs["time"] += t_elapsed ** 1.5 * time_cost_gain
         costs["power"] += np.average(log_data, axis=0)[6:10].sum() * t_elapsed * power_cost_gain
-        costs["noise"] *= noise_rule_cost_gain * noise_model_update_frequency
-        costs["altitude"] *= altitude_rule_cost_gain * noise_model_update_frequency
+        costs["noise"] += noise_cost * noise_rule_cost_gain
+        costs["altitude"] += altitude_cost * altitude_rule_cost_gain
 
         total_cost = sum([v for k, v in costs.items()])
 

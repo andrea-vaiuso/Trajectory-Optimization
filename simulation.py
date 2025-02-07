@@ -5,9 +5,9 @@ from utility import showPlot
 housing_estate = {
     "id": 1,
     "name": "Housing Estate",
-    "min_altitude": 70, 
+    "min_altitude": 150, 
     "max_altitude": 1000, 
-    "noise_penalty": 1,
+    "noise_penalty": 2,
     "color": "blue"
 }
 
@@ -23,7 +23,7 @@ industrial_area = {
 open_field = {
     "id": 3,
     "name": "Open Field",
-    "min_altitude": 20, 
+    "min_altitude": 0, 
     "max_altitude": 1000, 
     "noise_penalty": 0,
     "color": "green"
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     A = {
         "x": 0,
         "y": 0,
-        "z": 20,
+        "z": 500,
         "h_speed": 20,
         "v_speed": 8,
     }
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     B = {
         "x": 1000,
         "y": 1000,
-        "z": 20,
+        "z": 500,
         "h_speed": 20,
         "v_speed": 8,
     }
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         custom_points.append({
             "x": A["x"] + t * (B["x"] - A["x"]),
             "y": A["y"] + t * (B["y"] - A["y"]),
-            "z": A["z"] + t * (B["z"] - A["z"]), # + (-1)**i * 10,
+            "z": A["z"] + t * (B["z"] - A["z"]) + (-1)**i * 100,
             "h_speed": 20,
             "v_speed": 8,
         })
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     distAB = np.sqrt((B["x"] - A["x"])**2 + (B["y"] - A["y"])**2 + (B["z"] - A["z"])**2) * 1.1
     maxvel = np.sqrt(drone.max_horizontal_speed**2 + drone.max_vertical_speed**2)
     noise_rule_cost_gain = 1
-    altitude_rule_cost_gain = 1e-4
+    altitude_rule_cost_gain = 1
     time_cost_gain = maxvel / distAB
     distance_cost_gain = 1 / distAB
     power_cost_gain = time_cost_gain / drone.hover_rpm
