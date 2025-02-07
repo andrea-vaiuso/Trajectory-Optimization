@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-def showPlot(trajectory, A, B, all_targets, world, grid_size, max_world_size, log_data):
+def showPlot(trajectory, A, B, all_targets, world, grid_size, max_world_size, log_data, interval=60):
     traj_arr = np.array(trajectory)
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.plot(traj_arr[:, 0], traj_arr[:, 1], 'k-', linewidth=1.5, label="Trajectory")
@@ -75,6 +75,6 @@ def showPlot(trajectory, A, B, all_targets, world, grid_size, max_world_size, lo
         return line, point, log_text
 
     ani = animation.FuncAnimation(fig, update, frames=len(x_data),
-                                  init_func=init, interval=0.03, blit=True)
+                                  init_func=init, interval=interval, blit=True)
     plt.show()
 

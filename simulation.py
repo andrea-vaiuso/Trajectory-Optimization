@@ -48,16 +48,16 @@ if __name__ == "__main__":
         "x": 0,
         "y": 0,
         "z": 20,
-        "h_speed": 15,
-        "v_speed": 4,
+        "h_speed": 20,
+        "v_speed": 8,
     }
 
     B = {
         "x": 1000,
         "y": 1000,
         "z": 20,
-        "h_speed": 15,
-        "v_speed": 4,
+        "h_speed": 20,
+        "v_speed": 8,
     }
 
     print("Initializing drone...")
@@ -67,8 +67,8 @@ if __name__ == "__main__":
         min_RPM=2100,
         max_RPM=5000,
         hover_RPM=2700,
-        max_horizontal_speed=15.0,  
-        max_vertical_speed=5.0
+        max_horizontal_speed=20.0,  
+        max_vertical_speed=8.0
     )
 
     print("Creating custom points...")
@@ -80,8 +80,8 @@ if __name__ == "__main__":
             "x": A["x"] + t * (B["x"] - A["x"]),
             "y": A["y"] + t * (B["y"] - A["y"]),
             "z": A["z"] + t * (B["z"] - A["z"]) + (-1)**i * 10,
-            "h_speed": 14,
-            "v_speed": 4,
+            "h_speed": 20,
+            "v_speed": 8,
         })
 
     # Load angle noise model from npy file
