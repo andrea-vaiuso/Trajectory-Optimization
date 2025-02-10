@@ -301,13 +301,13 @@ class Simulation:
             
         
         elapsed = time.time() - start_time
-        costs["distance"] += total_distance ** 1.5 * distance_cost_gain
-        costs["time"] += t_elapsed ** 1.5 * time_cost_gain
+        costs["distance"] += total_distance ** 1.3 * distance_cost_gain
+        costs["time"] += t_elapsed ** 1.3 * time_cost_gain
         costs["power"] += np.average(log_data, axis=0)[6:10].sum() * t_elapsed * power_cost_gain
         costs["noise"] += noise_cost * noise_rule_cost_gain
         costs["altitude"] += altitude_cost * altitude_rule_cost_gain
 
-        total_cost = sum([v for k, v in costs.items()])
+        total_cost = np.sqrt(sum([v**2 for k, v in costs.items()]))
 
         print(f"Total cost: {total_cost:.2f}")
         print(f"Cost breakdown: {costs}")

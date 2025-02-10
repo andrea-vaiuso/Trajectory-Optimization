@@ -33,6 +33,8 @@ open_field = {
 # ----------------- Main Usage -----------------
 if __name__ == "__main__":
 
+    angle_noise_model = np.load("dnn_sound_model/angles_swl.npy")
+
     max_world_size = 1000
     grid_size = 10
     print("Creating world...")
@@ -79,13 +81,11 @@ if __name__ == "__main__":
         custom_points.append({
             "x": A["x"] + t * (B["x"] - A["x"]),
             "y": A["y"] + t * (B["y"] - A["y"]),
-            "z": A["z"] + t * (B["z"] - A["z"]) + (-1)**i * 100,
+            "z": A["z"] + t * (B["z"] - A["z"]), # + (-1)**i * 100,
             "h_speed": 20,
             "v_speed": 8,
         })
-
-    # Load angle noise model from npy file
-    angle_noise_model = np.load("dnn_sound_model/angles_swl.npy")
+    
     # Initialize simulation
     sim = Simulation(drone, world, angle_noise_model)
 
