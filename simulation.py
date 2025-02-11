@@ -1,6 +1,9 @@
 import numpy as np
-from SimComponent import Drone, World, Simulation
+from SimComponent import Simulation
+from World import World
+from Drone import Drone
 from utility import showPlot
+from optimization import get_cost_gains
 
 housing_estate = {
     "id": 1,
@@ -29,6 +32,46 @@ open_field = {
     "color": "green"
 }
 
+def create_custom_points(A, B, num_points):
+    custom_points = []
+    for i in range(1, num_points + 1):
+        new_point = {
+            "x": A["x"] + (B["x"] - A["x"]) * i / (num_points + 1),
+            "y": A["y"] + (B["y"] - A["y"]) * i / (num_points + 1),
+            "z": A["z"] + (B["z"] - A["z"]) * i / (num_points + 1),
+            "h_speed": 20,
+            "v_speed": 8,
+        }
+        custom_points.append(new_point)
+    return custom_points
+
+def create_random_custom_points(num_points, max_world_size, min_v_speed = 15, min_h_speed = 12):
+    custom_points = []
+    for i in range(1, num_points + 1):
+        new_point = {
+            "x": np.random.uniform(0, max_world_size),
+            "y": np.random.uniform(0, max_world_size),
+            "z": np.random.uniform(0, max_world_size),
+            "h_speed": np.random.uniform(min_v_speed, 20),
+            "v_speed": np.random.uniform(min_h_speed, 15),
+        }
+        custom_points.append(new_point)
+    return custom_points
+
+
+def create_custom_points_towards_B(A, B, num_points):
+    custom_points = []
+    for i in range(1, num_points + 1):
+        t = i / (num_points + 1)
+        new_point = {
+            "x": A["x"] + t * (B["x"] - A["x"]) + np.random.uniform(-150, 150),
+            "y": A["y"] + t * (B["y"] - A["y"]) + np.random.uniform(-150, 150),
+            "z": A["z"] + t * (B["z"] - A["z"]) + np.random.uniform(-150, 150),
+            "h_speed": np.random.uniform(15, 20),
+            "v_speed": np.random.uniform(12, 15),
+        }
+        custom_points.append(new_point)
+    return custom_points
 
 # ----------------- Main Usage -----------------
 if __name__ == "__main__":
@@ -74,29 +117,13 @@ if __name__ == "__main__":
     )
 
     print("Creating custom points...")
-    custom_points = []
-    num_points = 10
-    for i in range(1, num_points + 1):
-        t = i / (num_points + 1)
-        custom_points.append({
-            "x": A["x"] + t * (B["x"] - A["x"]),
-            "y": A["y"] + t * (B["y"] - A["y"]),
-            "z": A["z"] + t * (B["z"] - A["z"]), # + (-1)**i * 100,
-            "h_speed": 20,
-            "v_speed": 8,
-        })
+    custom_points = create_custom_points(A, B, 6)
     
     # Initialize simulation
     sim = Simulation(drone, world, angle_noise_model)
 
     # Set the cost gains
-    distAB = np.sqrt((B["x"] - A["x"])**2 + (B["y"] - A["y"])**2 + (B["z"] - A["z"])**2) * 1.1
-    maxvel = np.sqrt(drone.max_horizontal_speed**2 + drone.max_vertical_speed**2)
-    noise_rule_cost_gain = 1
-    altitude_rule_cost_gain = 1
-    time_cost_gain = maxvel / distAB
-    distance_cost_gain = 1 / distAB
-    power_cost_gain = time_cost_gain / drone.hover_rpm
+    noise_rule_cost_gain, altitude_rule_cost_gain, time_cost_gain, distance_cost_gain, power_cost_gain = get_cost_gains(A, B, drone)
 
     # Start simulation
     print("Simulating trajectory...")

@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from World import World
 
-def showPlot(trajectory, A, B, all_targets, world, grid_size, max_world_size, log_data, interval=60):
+def showPlot(trajectory, A, B, all_targets, world: World, grid_size, max_world_size, log_data, interval=1):
     traj_arr = np.array(trajectory)
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.plot(traj_arr[:, 0], traj_arr[:, 1], 'k-', linewidth=1.5, label="Trajectory")
@@ -13,7 +14,7 @@ def showPlot(trajectory, A, B, all_targets, world, grid_size, max_world_size, lo
         ax.text(pt[0]+5, pt[1]+5, f"{i}", color='blue', fontsize=8)
     for (x, y, z), params in world.grid.items():
         if z == 0:
-            rect = plt.Rectangle((x * grid_size, y * grid_size), grid_size, grid_size, color=params["color"], alpha=0.1)
+            rect = plt.Rectangle((x * grid_size, y * grid_size), grid_size, grid_size, color=world.AREA_PARAMS[params]["color"], alpha=0.1)
             ax.add_patch(rect)
     ax.set_xlabel("X (m)")
     ax.set_ylabel("Y (m)")
