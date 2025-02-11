@@ -132,3 +132,17 @@ class Drone:
         
         self.update_physics(target_position, dt, vertical_total_acceleration_factor, horizontal_total_acceleration_factor)
         return self.pitch, self.yaw, self.rpm_values.copy(), self.position.copy(), self.velocity.copy()
+    
+    def to_dict(self):
+        return {
+            'model_name': self.model_name,
+            'min_RPM': self.min_RPM,
+            'max_RPM': self.max_RPM,
+            'hover_rpm': self.hover_rpm,
+            'max_horizontal_speed': self.max_horizontal_speed,
+            'max_vertical_speed': self.max_vertical_speed,
+            'vertical_decel_distance': self.vertical_decel_distance,
+            'vertical_accel_distance': self.vertical_accel_distance,
+            'horiz_decel_distance': self.horiz_decel_distance,
+            'horiz_accel_distance': self.horiz_accel_distance,
+        }
