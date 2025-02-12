@@ -79,11 +79,11 @@ def showPlot(trajectory, A, B, all_targets, world: World, grid_size, max_world_s
                                   init_func=init, interval=interval, blit=True)
     plt.show()
 
-def plotCosts(costs, save=True, datetime=None):
+def plotCosts(costs, save=True, datetime=None, folder="OptimizedTrajectory"):
     plt.plot(costs)
     plt.xlabel("Iteration")
     plt.ylabel("Cost")
     plt.title("Costs over iterations")
     if save:
-        plt.savefig(f"{datetime}_costs.png")
+        plt.savefig(f"{folder}/{datetime}_costs.png")
     plt.show()
