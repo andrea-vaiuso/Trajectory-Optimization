@@ -3,7 +3,7 @@
     "best_cost": 14.598188278583919,
     "optimization_time_seconds": 18082.575716018677,
     "n_points": 7,
-    "coustom_points": [
+    "custom_points": [
         {
             "x": 1.0,
             "y": 1.0,
@@ -89,5 +89,6 @@
         "horiz_decel_distance": 15,
         "horiz_accel_distance": 10
     },
-    "angle_noise_model": "dnn_sound_model/angles_swl.npy"
+    "angle_noise_model": "dnn_sound_model/angles_swl.npy",
+    "world_file_name": "world_simple.pkl"
 }

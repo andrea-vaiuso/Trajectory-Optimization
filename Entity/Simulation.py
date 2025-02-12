@@ -4,8 +4,8 @@ import datetime
 import csv
 import numpy as np
 import math
-from Drone import Drone
-from World import World
+from Entity.Drone import Drone
+from Entity.World import World
 
 
 # --------------- Simulation Class (with CSV Logging and Plotting) ---------------

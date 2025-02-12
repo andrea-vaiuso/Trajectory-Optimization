@@ -1,30 +1,38 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from World import World
+from Entity.World import World
 
-def showPlot(trajectory, A, B, all_targets, world: World, grid_size, max_world_size, log_data, interval=1):
-    traj_arr = np.array(trajectory)
+def show2DWorld(world: World, grid_size, trajectory = None, A = None, B = None, all_targets = None, image_alpha = 0.7):
     fig, ax = plt.subplots(figsize=(8, 6))
-    ax.plot(traj_arr[:, 0], traj_arr[:, 1], 'k-', linewidth=1.5, label="Trajectory")
-    ax.scatter(A["x"], A["y"], color='green', s=50, label="A (Start)")
-    ax.scatter(B["x"], B["y"], color='red', s=50, label="B (Target)")
-    for i, pt in enumerate(all_targets[1:-1], 1):
-        ax.scatter(pt[0], pt[1], color='blue', s=30)
-        ax.text(pt[0]+5, pt[1]+5, f"{i}", color='blue', fontsize=8)
+
+    # Add background image
+    if world.background_image is not None:
+        bg_img = np.array(world.background_image)
+        ax.imshow(bg_img, extent=[0, world.max_world_size, 0, world.max_world_size], origin='lower', alpha=image_alpha, zorder=-1)
+
+    if trajectory is not None:
+        ax.scatter(A["x"], A["y"], color='green', s=50, label="A (Start)")
+        ax.scatter(B["x"], B["y"], color='red', s=50, label="B (Target)")
+        for i, pt in enumerate(all_targets[1:-1], 1):
+            ax.scatter(pt[0], pt[1], color='blue', s=30)
+            ax.text(pt[0]+5, pt[1]+5, f"{i}", color='blue', fontsize=8)
+    
     for (x, y, z), params in world.grid.items():
         if z == 0:
-            rect = plt.Rectangle((x * grid_size, y * grid_size), grid_size, grid_size, color=world.AREA_PARAMS[params]["color"], alpha=0.1)
+            rect = plt.Rectangle((x * grid_size, y * grid_size), grid_size, grid_size, color=world.AREA_PARAMS[params]["color"], alpha=world.AREA_PARAMS[params]["alpha"])
             ax.add_patch(rect)
+    
     ax.set_xlabel("X (m)")
     ax.set_ylabel("Y (m)")
-    ax.set_title("Drone 2D XY Trajectory with Waypoints")
-    ax.set_xlim(0, 1000)
-    ax.set_ylim(0, 1000)
-    ax.legend()
+    ax.set_title(f"2D World '{world.world_name}' XY")
+    ax.set_xlim(0, world.max_world_size)
+    ax.set_ylim(0, world.max_world_size)
+    ax.legend(loc='upper left')
     ax.grid(True)
     plt.show()
-        
+
+def showPlot(trajectory, A, B, all_targets, world: World, grid_size, max_world_size, log_data, interval=1):
     traj_arr = np.array(trajectory)
     x_data = traj_arr[:, 0]
     y_data = traj_arr[:, 1]

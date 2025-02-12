@@ -1,6 +1,7 @@
 import json
 import pickle
 import numpy as np
+from PIL import Image
 
 # ---------------- World Class ----------------
 class World:
@@ -12,7 +13,8 @@ class World:
             "min_altitude": 150, 
             "max_altitude": 1000, 
             "noise_penalty": 2,
-            "color": "blue"
+            "color": "blue",
+            "alpha": 0.2
         },
         2: {
             "id": 2,
@@ -20,7 +22,8 @@ class World:
             "min_altitude": 70, 
             "max_altitude": 1000, 
             "noise_penalty": 1,
-            "color": "yellow"
+            "color": "yellow",
+            "alpha": 0.2
         },
         3: {
             "id": 3,
@@ -28,17 +31,27 @@ class World:
             "min_altitude": 0, 
             "max_altitude": 1000, 
             "noise_penalty": 0,
-            "color": "green"
+            "color": "green",
+            "alpha": 0.1
         }
     }
     
     # Imposta l'ID di default (ad esempio, Open Field)
     DEFAULT_AREA_ID = 3
 
-    def __init__(self, grid_size, max_world_size):
+    def __init__(self, grid_size, max_world_size, world_name="World", background_image_path=None):
         self.grid_size = grid_size
         self.max_world_size = max_world_size
         self.grid = {}  # mapping: area coordinate tuple -> area_id
+        self.world_name = world_name
+        self.background_image = None
+        if background_image_path:
+            # Check if the background is squared and save it
+            self.background_image = np.array(Image.open(background_image_path).convert('RGB'))
+            if self.background_image.shape[0] != self.background_image.shape[1]:
+                print("Warning: the background image is not squared. Cropping it...")
+                min_dim = min(self.background_image.shape[0], self.background_image.shape[1])
+                self.background_image = self.background_image[:min_dim, :min_dim]
 
     def get_area(self, x, y, z):
         return (x // self.grid_size, y // self.grid_size, z // self.grid_size)
@@ -97,41 +110,23 @@ class World:
 
         return areas_in_circle, parameters_in_circle
 
-    def save_world(self, filename, use_pickle=True):
-        """
-        Salva il mondo su file.
-        Se use_pickle è True usa Pickle (più veloce), altrimenti JSON.
-        Qui salviamo solo i dati essenziali: grid_size, max_world_size e il grid (mappato da tuple -> area_id).
-        """
+    def save_world(self, filename):
         data = {
             'grid_size': self.grid_size,
             'max_world_size': self.max_world_size,
-            'grid': self.grid
+            'grid': self.grid,
+            'world_name': self.world_name,
+            'background_image': self.background_image
         }
-        if use_pickle:
-            with open(filename, 'wb') as file:
-                pickle.dump(data, file, protocol=pickle.HIGHEST_PROTOCOL)
-        else:
-            # Convertiamo le chiavi (tuple) in stringhe per JSON
-            data['grid'] = {str(k): v for k, v in self.grid.items()}
-            with open(filename, 'w') as file:
-                json.dump(data, file)
+        with open(filename, 'wb') as file:
+            pickle.dump(data, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     @classmethod
-    def load_world(cls, filename, use_pickle=True):
-        """
-        Carica il mondo da file.
-        Se use_pickle è True usa Pickle, altrimenti JSON.
-        """
-        if use_pickle:
-            with open(filename, 'rb') as file:
-                data = pickle.load(file)
-        else:
-            with open(filename, 'r') as file:
-                data = json.load(file)
-            # Convertiamo le chiavi in tuple
-            data['grid'] = {eval(k): v for k, v in data['grid'].items()}
-
-        world = cls(data['grid_size'], data['max_world_size'])
+    def load_world(cls, filename):
+        with open(filename, 'rb') as file:
+            data = pickle.load(file)
+        world = cls(data['grid_size'], data['max_world_size'], data['world_name'])
         world.grid = data['grid']
+        if data['background_image'] is not None:
+            world.background_image = data['background_image']
         return world

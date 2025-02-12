@@ -1,10 +1,10 @@
-from SimComponent import Simulation
-from World import World
-from Drone import Drone
+from Entity.Simulation import Simulation
+from Entity.World import World
+from Entity.Drone import Drone
 import numpy as np
 from skopt import gp_minimize
 from skopt.space import Integer, Real  # Per definire dimensioni discrete/continue
-from utility import showPlot, plotCosts
+from utility import showPlot, plotCosts, show2DWorld
 import time
 import datetime
 import json
@@ -25,6 +25,24 @@ def get_cost_gains(A: dict, B: dict, drone: Drone):
     power_cost_gain = time_cost_gain / drone.hover_rpm
     return noise_rule_cost_gain, altitude_rule_cost_gain, time_cost_gain, distance_cost_gain, power_cost_gain
 
+def execute_simulation(drone: Drone, world: World, noise_model, A, B, custom_points, cost_gains, showplots=True, interval=30):
+    sim = Simulation(drone, world, noise_model)
+    noise_gain, altitude_gain, time_gain, distance_gain, power_gain = cost_gains
+    trajectory, total_cost, log_data, all_targets = sim.simulate_trajectory(
+        point_a=A, point_b=B, dt=0.1,
+        horizontal_threshold=5.0, vertical_threshold=2.0,
+        custom_points=custom_points,
+        print_log=False,
+        noise_rule_cost_gain=noise_gain,
+        altitude_rule_cost_gain=altitude_gain,
+        time_cost_gain=time_gain,
+        distance_cost_gain=distance_gain,
+        power_cost_gain=power_gain
+    )
+    if showplots:
+        show2DWorld(world, world.grid_size, trajectory, A, B, all_targets)
+        showPlot(trajectory, A, B, all_targets, world, world.grid_size, world.max_world_size, log_data, interval=interval)
+
 def main():
     # Optimization parameters
     grid_size = 10 # Grid size (in meters)
@@ -35,7 +53,7 @@ def main():
     grid_step = 2
 
     print("Loading world...")
-    world = World.load_world("world.pkl")
+    world = World.load_world("world_winterthur.pkl")
 
     # Definizione dei punti A (inizio) e B (fine)
     A = {"x": 0, "y": 0, "z": 100, "h_speed": 20, "v_speed": 8}
@@ -66,14 +84,6 @@ def main():
     max_offset = perturbation_factor * distAB
 
     def cost_function(params):
-        """
-        Calcola il costo totale della traiettoria generata con num_points intermedi.
-        
-        I parametri ottimizzati sono organizzati per ciascun punto come:
-        [offset_x, offset_y, offset_z, h_speed, v_speed]
-        Qui applichiamo la discretizzazione interamente nella funzione: 
-        gli offset vengono arrotondati all'intero più vicino e moltiplicati per grid_step.
-        """
         global iterations, costs
         iterations += 1
         custom_points = []
@@ -211,7 +221,7 @@ def main():
         "best_cost": float(result.fun),
         "optimization_time_seconds": float(end_time - start_time),
         "n_points": int(num_points),
-        "coustom_points": custom_points_best,
+        "custom_points": custom_points_best,
         "A": {k: float(v) for k, v in A.items()},
         "B": {k: float(v) for k, v in B.items()},
         "grid_size": int(grid_size),
@@ -224,29 +234,16 @@ def main():
         "distance_cost_gain": float(distance_gain),
         "power_cost_gain": float(power_gain),
         "drone": drone.to_dict(),
-        "angle_noise_model": "dnn_sound_model/angles_swl.npy"
+        "angle_noise_model": "dnn_sound_model/angles_swl.npy",
+        "world_file_name": world.world_name
     }
 
     # Save the dictionary to a JSON file
     with open(f"OptimizedTrajectory/{time_str}_optimization_info.json", "w") as json_file:
         json.dump(optimization_info, json_file, indent=4)
-
-    sim = Simulation(drone, world, angle_noise_model)
     
     print("Executing simulation...")
-    trajectory, total_cost, log_data, all_targets = sim.simulate_trajectory(
-        point_a=A, point_b=B, dt=0.1,
-        horizontal_threshold=5.0, vertical_threshold=2.0,
-        custom_points=custom_points_best,
-        print_log=False,
-        noise_rule_cost_gain=noise_gain,
-        altitude_rule_cost_gain=altitude_gain,
-        time_cost_gain=time_gain,
-        distance_cost_gain=distance_gain,
-        power_cost_gain=power_gain
-    )
-
-    showPlot(trajectory, A, B, all_targets, world, grid_size, max_world_size, log_data)
+    execute_simulation(drone, world, angle_noise_model, A, B, custom_points_best, (noise_gain, altitude_gain, time_gain, distance_gain, power_gain))
 
 if __name__ == "__main__":
     main()
