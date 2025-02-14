@@ -1,0 +1,51 @@
+{
+    "n_iterations": 600,
+    "best_cost": 35.208996724749305,
+    "optimization_time_seconds": 27627.65513110161,
+    "n_points": 7,
+    "custom_points": [
+        {"x": 6.0, "y": 41.0, "z": 142.0, "h_speed": 20.0, "v_speed": 8.0}, 
+        {"x": 96.0, "y": 68.0, "z": 212.0, "h_speed": 8.514252259178189, "v_speed": 8.0}, 
+        {"x": 424.0, "y": 81.0, "z": 359.0, "h_speed": 20.0, "v_speed": 8.0}, 
+        {"x": 528.0, "y": 150.0, "z": 387.0, "h_speed": 20.0, "v_speed": 8.0}, 
+        {"x": 870.0, "y": 401.0, "z": 380.0, "h_speed": 20.0, "v_speed": 3.0}, 
+        {"x": 995.0, "y": 526.0, "z": 338.0, "h_speed": 20.0, "v_speed": 8.0}, 
+        {"x": 994.0, "y": 602.0, "z": 324.0, "h_speed": 15.898904187880373, "v_speed": 7.844066024328249}],
+    "A": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 100.0,
+        "h_speed": 20.0,
+        "v_speed": 8.0
+    },
+    "B": {
+        "x": 1000.0,
+        "y": 1000.0,
+        "z": 100.0,
+        "h_speed": 20.0,
+        "v_speed": 8.0
+    },
+    "grid_size": 10,
+    "max_world_size": 1000,
+    "perturbation_factor": 0.25,
+    "grid_step": 2,
+    "noise_rule_cost_gain": 1.0,
+    "altitude_rule_cost_gain": 1.0,
+    "time_cost_gain": 0.01384686019247983,
+    "distance_cost_gain": 0.0006428243465332249,
+    "power_cost_gain": 5.128466737955492e-06,
+    "drone": {
+        "model_name": "DJI Matrice 300 RTK",
+        "min_RPM": 2100,
+        "max_RPM": 5000,
+        "hover_rpm": 2700,
+        "max_horizontal_speed": 20.0,
+        "max_vertical_speed": 8.0,
+        "vertical_decel_distance": 15,
+        "vertical_accel_distance": 10,
+        "horiz_decel_distance": 15,
+        "horiz_accel_distance": 10
+    },
+    "angle_noise_model": "dnn_sound_model/angles_swl.npy",
+    "world_file_name": "Winterthur Area"
+}

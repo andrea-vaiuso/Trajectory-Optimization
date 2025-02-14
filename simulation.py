@@ -81,7 +81,7 @@ if __name__ == "__main__":
     )
 
     print("Creating custom points...")
-    custom_points = create_random_custom_points(num_points, max_world_size)
+    custom_points = load_custom_points("OptimizedTrajectory/2025-02-14_08-58-00/optimization_info.json")
     #custom_points = load_custom_points("OptimizedTrajectory/2025-02-11_20-55-31_optimization_info.json")
 
     # Start simulation

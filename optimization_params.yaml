@@ -1,0 +1,27 @@
+# Description: Optimization parameters for the drone trajectory optimization
+# World Parameters
+grid_size: 10 # Grid size (in meters) This determines the areas where the noise effect is calculated
+max_world_size: 1000 # Maximum world size (in meters)
+grid_step: 7 # Grid discretization step (in meters) for searching coordinates during optimization
+world_file_name: world_winterthur.pkl # World file name
+
+# Drone Parameters
+drone_model_name: "DJI Matrice 300 RTK" # Drone model name
+min_RPM: 2100 # Minimum manufacturer RPM
+max_RPM: 5000 # Maximum manufacturer RPM
+hover_RPM: 2700 # Hover RPM
+max_horizontal_speed: 20.0 # Maximum manufacturer horizontal speed (in m/s)
+max_vertical_speed: 8.0 # Maximum manufacturer vertical speed (in m/s)
+
+# Simulation Parameters
+noise_model: "dnn_sound_model/angles_swl.npy" # Noise model file name
+
+# Optimization Parameters
+optimization_random_state: 42 # Random state for optimization
+n_iterations: 11 # Number of optimization iterations
+
+# Trajectory Parameters
+num_points: 7 # Number of intermediate points
+perturbation_factor: 0.25 # Perturbation factor for the maximum offset starting from the distance between A and B
+A: {"x": 0, "y": 0, "z": 100, "h_speed": 20, "v_speed": 8} # Starting Point A
+B: {"x": 1000, "y": 1000, "z": 100, "h_speed": 20, "v_speed": 8} # Ending Point B

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from Entity.World import World
 
-def show2DWorld(world: World, grid_size, trajectory = None, A = None, B = None, all_targets = None, image_alpha = 0.7):
+def show2DWorld(world: World, grid_size, trajectory = None, A = None, B = None, all_targets = None, image_alpha = 0.7, save=False, save_folder="OptimizedTrajectory"):
     fig, ax = plt.subplots(figsize=(8, 6))
 
     # Add background image
@@ -11,17 +11,17 @@ def show2DWorld(world: World, grid_size, trajectory = None, A = None, B = None, 
         bg_img = np.array(world.background_image)
         ax.imshow(bg_img, extent=[0, world.max_world_size, 0, world.max_world_size], origin='lower', alpha=image_alpha, zorder=-1)
 
-    if trajectory is not None:
-        ax.scatter(A["x"], A["y"], color='green', s=50, label="A (Start)")
-        ax.scatter(B["x"], B["y"], color='red', s=50, label="B (Target)")
-        for i, pt in enumerate(all_targets[1:-1], 1):
-            ax.scatter(pt[0], pt[1], color='blue', s=30)
-            ax.text(pt[0]+5, pt[1]+5, f"{i}", color='blue', fontsize=8)
-    
     for (x, y, z), params in world.grid.items():
         if z == 0:
             rect = plt.Rectangle((x * grid_size, y * grid_size), grid_size, grid_size, color=world.AREA_PARAMS[params]["color"], alpha=world.AREA_PARAMS[params]["alpha"])
             ax.add_patch(rect)
+
+    if trajectory is not None:
+        ax.scatter(A["x"], A["y"], color='green', s=50, label="A (Start)")
+        ax.scatter(B["x"], B["y"], color='blue', s=50, label="B (Target)")
+        for i, pt in enumerate(all_targets[1:-1], 1):
+            ax.scatter(pt[0], pt[1], color='red', s=30)
+            ax.text(pt[0]+5, pt[1]+5, f"{i}", color='red', fontsize=8)
     
     ax.set_xlabel("X (m)")
     ax.set_ylabel("Y (m)")
@@ -30,6 +30,8 @@ def show2DWorld(world: World, grid_size, trajectory = None, A = None, B = None, 
     ax.set_ylim(0, world.max_world_size)
     ax.legend(loc='upper left')
     ax.grid(True)
+    if save:
+        plt.savefig(f"{save_folder}/trajectory_{world.world_name}.png", dpi=300)
     plt.show()
 
 def showPlot(trajectory, A, B, all_targets, world: World, grid_size, max_world_size, log_data, interval=1):
@@ -42,7 +44,7 @@ def showPlot(trajectory, A, B, all_targets, world: World, grid_size, max_world_s
     ax = fig.add_subplot(111, projection='3d')
 
     line, = ax.plot([], [], [], 'k--', lw=1.5)
-    point, = ax.plot([], [], [], 'ro', markersize=8)
+    point, = ax.plot([], [], [], marker='v', color='r', markersize=8, linestyle='None')
 
     ax.set_xlim(0, max_world_size)
     ax.set_ylim(0, max_world_size)
@@ -55,11 +57,11 @@ def showPlot(trajectory, A, B, all_targets, world: World, grid_size, max_world_s
     # Scatter marker per i waypoint
     ax.scatter(A["x"], A["y"], A["z"], color='green', s=50, label='A')
     for i, pt in enumerate(all_targets[1:-1], 1):
-        ax.scatter(pt[0], pt[1], pt[2], color='blue', s=30)
-        ax.text(pt[0], pt[1], pt[2], f"{i}", color='blue', fontsize=8)
-    ax.scatter(B["x"], B["y"], B["z"], color='red', s=50, label='B')
+        ax.scatter(pt[0], pt[1], pt[2], color='red', s=30)
+        ax.text(pt[0], pt[1], pt[2], f"{i}", color='red', fontsize=8)
+    ax.scatter(B["x"], B["y"], B["z"], color='blue', s=50, label='B')
 
-    log_text = ax.text2D(0.05, 0.05, "", transform=ax.transAxes, fontsize=8, color='purple')
+    log_text = ax.text2D(0, 0.05, "", transform=ax.transAxes, fontsize=8, color='purple')
 
     def init():
         line.set_data([], [])
@@ -79,6 +81,7 @@ def showPlot(trajectory, A, B, all_targets, world: World, grid_size, max_world_s
             log_str = (f"Time: {ld[0]} s\n"
                        f"RPMs: [{ld[6]}, {ld[7]}, {ld[8]}, {ld[9]}]\n"
                        f"Velocity: ({ld[10]}, {ld[11]}, {ld[12]}) - h ({round(np.sqrt(ld[10]**2+ld[11]**2),2)}, v ({round(ld[12])}))\n"
+                       f"Altitude: {ld[3]:.2f} m\n"
                        f"Pitch: {ld[4]} rad, Yaw: {ld[5]} rad")
             log_text.set_text(log_str)
         return line, point, log_text
@@ -93,5 +96,5 @@ def plotCosts(costs, save=True, datetime=None, folder="OptimizedTrajectory"):
     plt.ylabel("Cost")
     plt.title("Costs over iterations")
     if save:
-        plt.savefig(f"{folder}/{datetime}_costs.png")
+        plt.savefig(f"{folder}/{datetime}/costs.png", dpi=300)
     plt.show()

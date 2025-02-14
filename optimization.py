@@ -8,6 +8,8 @@ from utility import showPlot, plotCosts, show2DWorld
 import time
 import datetime
 import json
+import yaml
+import os
 
 iterations = 0
 costs = [1e9]
@@ -25,10 +27,10 @@ def get_cost_gains(A: dict, B: dict, drone: Drone):
     power_cost_gain = time_cost_gain / drone.hover_rpm
     return noise_rule_cost_gain, altitude_rule_cost_gain, time_cost_gain, distance_cost_gain, power_cost_gain
 
-def execute_simulation(drone: Drone, world: World, noise_model, A, B, custom_points, cost_gains, showplots=True, interval=30):
+def execute_simulation(drone: Drone, world: World, noise_model, A, B, custom_points, cost_gains, showplots=True, interval=30, log_folder="Logs"):
     sim = Simulation(drone, world, noise_model)
     noise_gain, altitude_gain, time_gain, distance_gain, power_gain = cost_gains
-    trajectory, total_cost, log_data, all_targets = sim.simulate_trajectory(
+    trajectory, total_cost, log_data, all_targets, simulation_completed = sim.simulate_trajectory(
         point_a=A, point_b=B, dt=0.1,
         horizontal_threshold=5.0, vertical_threshold=2.0,
         custom_points=custom_points,
@@ -37,50 +39,56 @@ def execute_simulation(drone: Drone, world: World, noise_model, A, B, custom_poi
         altitude_rule_cost_gain=altitude_gain,
         time_cost_gain=time_gain,
         distance_cost_gain=distance_gain,
-        power_cost_gain=power_gain
+        power_cost_gain=power_gain,
+        save_log=True,
+        save_log_folder=log_folder
     )
     if showplots:
-        show2DWorld(world, world.grid_size, trajectory, A, B, all_targets)
+        show2DWorld(world, world.grid_size, trajectory, A, B, all_targets, save=True, save_folder=log_folder)    
         showPlot(trajectory, A, B, all_targets, world, world.grid_size, world.max_world_size, log_data, interval=interval)
 
 def main():
-    # Optimization parameters
-    grid_size = 10 # Grid size (in meters)
-    max_world_size = 1000 # Maximum world size (in meters)
-    num_points = 7 # Number of intermediate points
-    n_iterations = 500 # Number of optimization iterations
-    perturbation_factor = 0.35 # Perturbation factor for the maximum offset starting from the distance between A and B
-    grid_step = 2
+    # Load optimization parameters from a YAML file
+    with open("optimization_params.yaml", "r") as file:
+        params = yaml.safe_load(file)
+
+    grid_size = params["grid_size"]
+    max_world_size = params["max_world_size"]
+    num_points = params["num_points"]
+    n_iterations = params["n_iterations"]
+    perturbation_factor = params["perturbation_factor"]
+    grid_step = params["grid_step"]
+    world_file_name = params["world_file_name"]
+    A = params["A"]
+    B = params["B"]
 
     print("Loading world...")
-    world = World.load_world("world_winterthur.pkl")
+    world = World.load_world(world_file_name)
 
-    # Definizione dei punti A (inizio) e B (fine)
-    A = {"x": 0, "y": 0, "z": 100, "h_speed": 20, "v_speed": 8}
-    B = {"x": 1000, "y": 1000, "z": 100, "h_speed": 20, "v_speed": 8}
 
+    print("Creating drone...")
     drone = Drone(
-        model_name="DJI Matrice 300 RTK",
+        model_name=params["drone_model_name"],
         x=A["x"],
         y=A["y"],
         z=A["z"],
-        min_RPM=2100,
-        max_RPM=5000,
-        hover_RPM=2700,
-        max_horizontal_speed=20.0,
-        max_vertical_speed=8.0
+        min_RPM=params["min_RPM"],
+        max_RPM=params["max_RPM"],
+        hover_RPM=params["hover_RPM"],
+        max_horizontal_speed=params["max_horizontal_speed"],
+        max_vertical_speed=params["max_vertical_speed"]
     )
+
     print("Loading noise model...")
-    angle_noise_model = np.load("dnn_sound_model/angles_swl.npy")
+    angle_noise_model = np.load(params["noise_model"])
+    
     print("Initializing simulation...")
     sim = Simulation(drone, world, angle_noise_model)
-
-    # Calcola i cost gains
+    
     noise_gain, altitude_gain, time_gain, distance_gain, power_gain = get_cost_gains(A, B, drone)
     
     # Calcola la distanza tra A e B e definisci la perturbazione massima
     distAB = np.sqrt((B["x"] - A["x"])**2 + (B["y"] - A["y"])**2 + (B["z"] - A["z"])**2)
-    perturbation_factor = 0.25  # ad esempio il 25% della distanza totale
     max_offset = perturbation_factor * distAB
 
     def cost_function(params):
@@ -114,7 +122,7 @@ def main():
             }
             custom_points.append(point)
         print(f"Iteration ({iterations}/{n_iterations}) | Best: {min(costs):.2f} | ", end="")
-        _, total_cost, _, _ = sim.simulate_trajectory(
+        _, total_cost, _, _, simulation_completed = sim.simulate_trajectory(
             point_a=A, point_b=B, dt=1,
             horizontal_threshold=5.0, vertical_threshold=2.0,
             custom_points=custom_points,
@@ -127,7 +135,10 @@ def main():
             print_info=False,
             save_log=False
         )
-        costs.append(total_cost)
+        if simulation_completed:
+            costs.append(total_cost)
+        else:
+            costs.append(np.nan)
         return total_cost
 
     # Costruiamo i bounds per ciascun punto intermedio.
@@ -178,7 +189,7 @@ def main():
     print("Starting optimization...")
     start_time = time.time()
 
-    result = gp_minimize(cost_function, dimensions, x0=x0, n_calls=n_iterations, random_state=0)
+    result = gp_minimize(cost_function, dimensions, x0=x0, n_calls=n_iterations, random_state=params["optimization_random_state"])
 
     end_time = time.time()
     print("Optimal cost:", result.fun)
@@ -213,7 +224,11 @@ def main():
     print("Best points:", custom_points_best)
     # Save the best custom points into a file
     time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    np.save(f"OptimizedTrajectory/{time_str}_bestpoints.npy", custom_points_best)
+
+    # Create the folder if it doesn't exist
+    os.makedirs(f"OptimizedTrajectory/{time_str}", exist_ok=True)
+
+    np.save(f"OptimizedTrajectory/{time_str}/bestpoints.npy", custom_points_best)
     plotCosts(costs[1:], save=True, datetime=time_str)
     # Create a dictionary to store optimization information
     optimization_info = {
@@ -239,11 +254,23 @@ def main():
     }
 
     # Save the dictionary to a JSON file
-    with open(f"OptimizedTrajectory/{time_str}_optimization_info.json", "w") as json_file:
+    with open(f"OptimizedTrajectory/{time_str}/optimization_info.json", "w") as json_file:
         json.dump(optimization_info, json_file, indent=4)
     
     print("Executing simulation...")
-    execute_simulation(drone, world, angle_noise_model, A, B, custom_points_best, (noise_gain, altitude_gain, time_gain, distance_gain, power_gain))
+    execute_simulation(drone,
+                    world,
+                    angle_noise_model, 
+                    A, B, 
+                    custom_points_best, 
+                    (noise_gain, 
+                        altitude_gain, 
+                        time_gain, 
+                        distance_gain, 
+                        power_gain),
+                    showplots=True,
+                    interval=30,
+                    log_folder=f"OptimizedTrajectory/{time_str}")
 
 if __name__ == "__main__":
     main()

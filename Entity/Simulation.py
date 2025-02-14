@@ -39,9 +39,11 @@ class Simulation:
                             power_cost_gain=1.0,
                             time_limit_gain=10,
                             save_log=True,
+                            save_log_folder="Logs",
                             print_info=True,
                             ):
         self.drone.set_position(point_a["x"], point_a["y"], point_a["z"])
+        simulation_completed = True
         start_time = time.time()
         targets = self.generate_intermediate_points(point_a, point_b, custom_points)
         all_targets = targets.copy()
@@ -141,20 +143,23 @@ class Simulation:
                 costs["distance"] *= 9e4
                 costs["time"] *= 9e4
                 costs["power"] *= 9e4
+                simulation_completed = False
 
         total_cost = np.sqrt(sum([v**2 for k, v in costs.items()]))
-
+        total_cost_print = total_cost
+        if not simulation_completed:
+            total_cost_print = np.nan
         if print_info: print(f"Total cost: {total_cost:.2f}")
         if print_info: print(f"Cost breakdown: {costs}")
 
-        print(f"Sim_time: {elapsed:.2f}s | Flight_time: {t_elapsed:.2f}s | Dist: {total_distance:.2f}m | Cost: {total_cost:.2f}")
+        print(f"Sim_time: {elapsed:.2f}s | Flight_time: {t_elapsed:.2f}s | Dist: {total_distance:.2f}m | Cost: {total_cost_print:.2f}")
 
         if save_log:
-            csv_filename = f"Logs/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_drone_log.csv"
+            csv_filename = f"{save_log_folder}/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_drone_log.csv"
             with open(csv_filename, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow(["Time(s)", "X", "Y", "Z", "Pitch", "Yaw", "FL", "FR", "RL", "RR", "Vx", "Vy", "Vz", "Hor_Speed"])
                 writer.writerows(log_data)
             print(f"Log saved to {csv_filename}.")
 
-        return trajectory, total_cost, log_data, all_targets
+        return trajectory, total_cost, log_data, all_targets, simulation_completed
