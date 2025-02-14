@@ -15,9 +15,6 @@ iterations = 0
 costs = [1e9]
 
 def get_cost_gains(A: dict, B: dict, drone: Drone):
-    """
-    Calcola i cost gains basati sui punti A e B e sulle specifiche del drone.
-    """
     distAB = np.sqrt((B["x"] - A["x"])**2 + (B["y"] - A["y"])**2 + (B["z"] - A["z"])**2) * 1.1
     maxvel = np.sqrt(drone.max_horizontal_speed**2 + drone.max_vertical_speed**2)
     noise_rule_cost_gain = 1
@@ -30,7 +27,7 @@ def get_cost_gains(A: dict, B: dict, drone: Drone):
 def execute_simulation(drone: Drone, world: World, noise_model, A, B, custom_points, cost_gains, showplots=True, interval=30, log_folder="Logs"):
     sim = Simulation(drone, world, noise_model)
     noise_gain, altitude_gain, time_gain, distance_gain, power_gain = cost_gains
-    trajectory, total_cost, log_data, all_targets, simulation_completed = sim.simulate_trajectory(
+    trajectory, _, log_data, all_targets, _ = sim.simulate_trajectory(
         point_a=A, point_b=B, dt=0.1,
         horizontal_threshold=5.0, vertical_threshold=2.0,
         custom_points=custom_points,
@@ -48,7 +45,6 @@ def execute_simulation(drone: Drone, world: World, noise_model, A, B, custom_poi
         showPlot(trajectory, A, B, all_targets, world, world.grid_size, world.max_world_size, log_data, interval=interval)
 
 def main():
-    # Load optimization parameters from a YAML file
     with open("optimization_params.yaml", "r") as file:
         params = yaml.safe_load(file)
 
@@ -87,7 +83,6 @@ def main():
     
     noise_gain, altitude_gain, time_gain, distance_gain, power_gain = get_cost_gains(A, B, drone)
     
-    # Calcola la distanza tra A e B e definisci la perturbazione massima
     distAB = np.sqrt((B["x"] - A["x"])**2 + (B["y"] - A["y"])**2 + (B["z"] - A["z"])**2)
     max_offset = perturbation_factor * distAB
 
@@ -195,8 +190,6 @@ def main():
     print("Optimal cost:", result.fun)
     print("Total optimization time: {:.2f} seconds".format(end_time - start_time))
 
-    # Estrae i migliori parametri e li converte nei punti custom,
-    # applicando anch'essi la discretizzazione.
     best_params = result.x
 
     print("Simulating best trajectory...")

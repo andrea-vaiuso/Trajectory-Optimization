@@ -6,6 +6,7 @@ from utility import showPlot, show2DWorld
 from Old_scripts.optimization import get_cost_gains
 import json
 from optimization import execute_simulation
+import yaml
 
 def create_AtoB_custom_points(A, B, num_points):
     custom_points = []
@@ -55,31 +56,38 @@ def load_custom_points(file):
 
 # ----------------- Main Usage -----------------
 if __name__ == "__main__":
+    with open("optimization_params.yaml", "r") as file:
+        params = yaml.safe_load(file)
 
-    angle_noise_model = np.load("dnn_sound_model/angles_swl.npy")
+    grid_size = params["grid_size"]
+    max_world_size = params["max_world_size"]
+    num_points = params["num_points"]
+    n_iterations = params["n_iterations"]
+    perturbation_factor = params["perturbation_factor"]
+    grid_step = params["grid_step"]
+    world_file_name = params["world_file_name"]
+    A = params["A"]
+    B = params["B"]
 
-    max_world_size = 1000
-    grid_size = 10
-    num_points = 7 
     print("Loading world...")
-    world = World.load_world("world_winterthur.pkl")
+    world = World.load_world(world_file_name)
 
-    # Definizione dei punti A (inizio) e B (fine)
-    A = {"x": 0, "y": 0, "z": 100, "h_speed": 20, "v_speed": 8}
-    B = {"x": 1000, "y": 1000, "z": 100, "h_speed": 20, "v_speed": 8}
 
+    print("Creating drone...")
     drone = Drone(
-        model_name="DJI Matrice 300 RTK",
+        model_name=params["drone_model_name"],
         x=A["x"],
         y=A["y"],
         z=A["z"],
-        min_RPM=2100,
-        max_RPM=5000,
-        hover_RPM=2700,
-        max_horizontal_speed=20.0,
-        max_vertical_speed=8.0
+        min_RPM=params["min_RPM"],
+        max_RPM=params["max_RPM"],
+        hover_RPM=params["hover_RPM"],
+        max_horizontal_speed=params["max_horizontal_speed"],
+        max_vertical_speed=params["max_vertical_speed"]
     )
 
+    print("Loading noise model...")
+    angle_noise_model = np.load(params["noise_model"])
     print("Creating custom points...")
     custom_points = load_custom_points("OptimizedTrajectory/2025-02-14_08-58-00/optimization_info.json")
     #custom_points = load_custom_points("OptimizedTrajectory/2025-02-11_20-55-31_optimization_info.json")
