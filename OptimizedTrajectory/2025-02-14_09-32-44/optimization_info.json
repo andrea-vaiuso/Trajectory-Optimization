@@ -1,0 +1,94 @@
+{
+    "n_iterations": 50,
+    "best_cost": 39.135068422176225,
+    "optimization_time_seconds": 72.69522714614868,
+    "n_points": 7,
+    "custom_points": [
+        {
+            "x": 125.0,
+            "y": 225.0,
+            "z": 300.0,
+            "h_speed": 10.447344817465051,
+            "v_speed": 3.0
+        },
+        {
+            "x": 450.0,
+            "y": 100.0,
+            "z": 200.0,
+            "h_speed": 16.57642291451601,
+            "v_speed": 7.586554461984132
+        },
+        {
+            "x": 375.0,
+            "y": 275.0,
+            "z": 400.0,
+            "h_speed": 12.852517619711243,
+            "v_speed": 4.747167469155674
+        },
+        {
+            "x": 550.0,
+            "y": 250.0,
+            "z": 200.0,
+            "h_speed": 6.065547689888825,
+            "v_speed": 5.5906136100585515
+        },
+        {
+            "x": 775.0,
+            "y": 725.0,
+            "z": 350.0,
+            "h_speed": 19.471439923494792,
+            "v_speed": 7.077155491692388
+        },
+        {
+            "x": 750.0,
+            "y": 750.0,
+            "z": 350.0,
+            "h_speed": 5.0,
+            "v_speed": 5.399492708277424
+        },
+        {
+            "x": 975.0,
+            "y": 975.0,
+            "z": 400.0,
+            "h_speed": 18.34433261762318,
+            "v_speed": 6.368981436938467
+        }
+    ],
+    "A": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 100.0,
+        "h_speed": 20.0,
+        "v_speed": 8.0
+    },
+    "B": {
+        "x": 1000.0,
+        "y": 1000.0,
+        "z": 100.0,
+        "h_speed": 20.0,
+        "v_speed": 8.0
+    },
+    "grid_size": 10,
+    "max_world_size": 1000,
+    "perturbation_factor": 0.25,
+    "grid_step": 50,
+    "noise_rule_cost_gain": 1.0,
+    "altitude_rule_cost_gain": 1.0,
+    "time_cost_gain": 0.01384686019247983,
+    "distance_cost_gain": 0.0006428243465332249,
+    "power_cost_gain": 5.128466737955492e-06,
+    "drone": {
+        "model_name": "DJI Matrice 300 RTK",
+        "min_RPM": 2100,
+        "max_RPM": 5000,
+        "hover_rpm": 2700,
+        "max_horizontal_speed": 20.0,
+        "max_vertical_speed": 8.0,
+        "vertical_decel_distance": 15,
+        "vertical_accel_distance": 10,
+        "horiz_decel_distance": 15,
+        "horiz_accel_distance": 10
+    },
+    "angle_noise_model": "dnn_sound_model/angles_swl.npy",
+    "world_file_name": "Winterthur Area"
+}

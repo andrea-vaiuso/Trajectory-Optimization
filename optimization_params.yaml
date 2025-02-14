@@ -1,8 +1,13 @@
 # Description: Optimization parameters for the drone trajectory optimization
+
+# Optimization Parameters
+n_iterations: 590 # Number of optimization iterations
+optimization_random_state: 42 # Random state for optimization
+
 # World Parameters
 grid_size: 10 # Grid size (in meters) This determines the areas where the noise effect is calculated
 max_world_size: 1000 # Maximum world size (in meters)
-grid_step: 7 # Grid discretization step (in meters) for searching coordinates during optimization
+grid_step: 1 # Grid discretization step (in meters) for searching coordinates during optimization
 world_file_name: world_winterthur.pkl # World file name
 
 # Drone Parameters
@@ -15,10 +20,6 @@ max_vertical_speed: 8.0 # Maximum manufacturer vertical speed (in m/s)
 
 # Simulation Parameters
 noise_model: "dnn_sound_model/angles_swl.npy" # Noise model file name
-
-# Optimization Parameters
-optimization_random_state: 42 # Random state for optimization
-n_iterations: 11 # Number of optimization iterations
 
 # Trajectory Parameters
 num_points: 7 # Number of intermediate points

@@ -96,7 +96,7 @@ class Simulation:
                         # Set SWL depending on drone RPM
                         swl = swl_ref_rpm + 10 * np.log10(rpms[0] / self.drone.hover_rpm)
                         # Calculate sound pressure level
-                        spl = swl - abs(10 * np.log10(1/4*np.pi*distance**2))
+                        spl = swl - abs(10 * np.log10(1/4*np.pi*(distance+1e-4)**2))
                         average_spl += spl
                         #print(spl)
                         # Check if area rules are violated
