@@ -144,19 +144,19 @@ def main():
             upper_x = min(max_offset, max_world_size - base_point["x"])
             lx_disc = int(np.ceil(lower_x / grid_step))
             ux_disc = int(np.floor(upper_x / grid_step))
-            offset_x = trial.suggest_int(f"offset_x_{i}", lx_disc, ux_disc, step=10)
+            offset_x = trial.suggest_int(f"offset_x_{i}", lx_disc, ux_disc, step=grid_step)
 
             lower_y = max(-max_offset, -base_point["y"])
             upper_y = min(max_offset, max_world_size - base_point["y"])
             ly_disc = int(np.ceil(lower_y / grid_step))
             uy_disc = int(np.floor(upper_y / grid_step))
-            offset_y = trial.suggest_int(f"offset_y_{i}", ly_disc, uy_disc, step=10)
+            offset_y = trial.suggest_int(f"offset_y_{i}", ly_disc, uy_disc, step=grid_step)
 
             lower_z = max(-max_offset, -base_point["z"])
             upper_z = min(max_offset, max_world_size - base_point["z"])
             lz_disc = int(np.ceil(lower_z / grid_step))
             uz_disc = int(np.floor(upper_z / grid_step))
-            offset_z = trial.suggest_int(f"offset_z_{i}", lz_disc, uz_disc, step=10)
+            offset_z = trial.suggest_int(f"offset_z_{i}", lz_disc, uz_disc, step=grid_step)
 
             h_speed = trial.suggest_int(f"h_speed_{i}", 5, params["max_horizontal_speed"], step=1)
             v_speed = trial.suggest_int(f"v_speed_{i}", 3, params["max_vertical_speed"], step=1)
@@ -189,6 +189,7 @@ def main():
     print("Starting optimization with Optuna...")
     study = optuna.create_study(direction="minimize", sampler=TPESampler(seed=params["optimization_random_state"]))
     start_time = time.time()
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
     study.optimize(objective, n_trials=n_iterations)
     end_time = time.time()
 
@@ -253,6 +254,7 @@ def main():
         interval=30,
         log_folder=f"OptimizedTrajectory/{time_str}"
     )
+
 
 if __name__ == "__main__":
     main()

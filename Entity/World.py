@@ -12,7 +12,7 @@ class World:
             "name": "Housing Estate",
             "min_altitude": 150, 
             "max_altitude": 1000, 
-            "noise_penalty": 2,
+            "noise_penalty": 3,
             "color": "blue",
             "alpha": 0.2
         },

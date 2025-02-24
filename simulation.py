@@ -10,7 +10,7 @@ import yaml
 
 def create_AtoB_custom_points(A, B, num_points):
     custom_points = []
-    for i in range(1, num_points + 1):
+    for _ in range(1, num_points + 1):
         new_point = {
             "x": A["x"] + (B["x"] - A["x"]) * i / (num_points + 1),
             "y": A["y"] + (B["y"] - A["y"]) * i / (num_points + 1),
@@ -54,6 +54,9 @@ def load_custom_points(file):
         sim_file = json.load(f)
         return sim_file["custom_points"]
 
+def load_custom_points_npy(file):
+    return np.load(file, allow_pickle=True)
+
 # ----------------- Main Usage -----------------
 if __name__ == "__main__":
     with open("optimization_params.yaml", "r") as file:
@@ -89,10 +92,11 @@ if __name__ == "__main__":
     print("Loading noise model...")
     angle_noise_model = np.load(params["noise_model"])
     print("Creating custom points...")
-    custom_points = load_custom_points("OptimizedTrajectory/2025-02-14_08-58-00/optimization_info.json")
+    #custom_points = load_custom_points("OptimizedTrajectory/2025-02-14_08-58-00/optimization_info.json")
     #custom_points = load_custom_points("OptimizedTrajectory/2025-02-11_20-55-31_optimization_info.json")
+    custom_points = load_custom_points_npy("OptimizedTrajectory/2025-02-21_15-25-19/bestpoints.npy")
 
     # Start simulation
     print("Simulating trajectory...")
-    execute_simulation(drone, world, angle_noise_model, A, B, custom_points, get_cost_gains(A, B, drone))
+    execute_simulation(drone, world, angle_noise_model, A, B, custom_points, get_cost_gains(A, B, drone), log_folder="OptimizedTrajectory/2025-02-21_15-25-19")
 

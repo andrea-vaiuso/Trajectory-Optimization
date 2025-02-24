@@ -1,0 +1,131 @@
+{
+    "n_iterations": 1000,
+    "best_cost": 26.009510912489052,
+    "optimization_time_seconds": 777.1630816459656,
+    "n_points": 7,
+    "custom_points": [
+        {
+            "x": 104.0,
+            "y": 300.0,
+            "z": 443.0,
+            "h_speed": 7,
+            "v_speed": 5
+        },
+        {
+            "x": 61.0,
+            "y": 411.0,
+            "z": 401.0,
+            "h_speed": 13,
+            "v_speed": 7
+        },
+        {
+            "x": 60.0,
+            "y": 473.0,
+            "z": 366.0,
+            "h_speed": 6,
+            "v_speed": 5
+        },
+        {
+            "x": 269.0,
+            "y": 584.0,
+            "z": 310.0,
+            "h_speed": 20,
+            "v_speed": 6
+        },
+        {
+            "x": 303.0,
+            "y": 569.0,
+            "z": 310.0,
+            "h_speed": 7,
+            "v_speed": 5
+        },
+        {
+            "x": 841.0,
+            "y": 792.0,
+            "z": 233.0,
+            "h_speed": 19,
+            "v_speed": 4
+        },
+        {
+            "x": 945.0,
+            "y": 847.0,
+            "z": 226.0,
+            "h_speed": 20,
+            "v_speed": 5
+        }
+    ],
+    "A": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 100.0,
+        "h_speed": 20.0,
+        "v_speed": 8.0
+    },
+    "B": {
+        "x": 1000.0,
+        "y": 1000.0,
+        "z": 100.0,
+        "h_speed": 20.0,
+        "v_speed": 8.0
+    },
+    "grid_size": 10,
+    "max_world_size": 1000,
+    "perturbation_factor": 0.25,
+    "grid_step": 7,
+    "noise_rule_cost_gain": 1.0,
+    "altitude_rule_cost_gain": 1.0,
+    "time_cost_gain": 0.01384686019247983,
+    "distance_cost_gain": 0.0006428243465332249,
+    "power_cost_gain": 5.128466737955492e-06,
+    "drone": {
+        "model_name": "DJI Matrice 300 RTK",
+        "min_RPM": 2100,
+        "max_RPM": 5000,
+        "hover_rpm": 2700,
+        "max_horizontal_speed": 20.0,
+        "max_vertical_speed": 8.0,
+        "vertical_decel_distance": 15,
+        "vertical_accel_distance": 10,
+        "horiz_decel_distance": 15,
+        "horiz_accel_distance": 10
+    },
+    "angle_noise_model": "dnn_sound_model/angles_swl.npy",
+    "world_file_name": "Winterthur Area",
+    "best_trial_params": {
+        "offset_x_0": -3,
+        "offset_y_0": 25,
+        "offset_z_0": 49,
+        "h_speed_0": 7,
+        "v_speed_0": 5,
+        "offset_x_1": -27,
+        "offset_y_1": 23,
+        "offset_z_1": 43,
+        "h_speed_1": 13,
+        "v_speed_1": 7,
+        "offset_x_2": -45,
+        "offset_y_2": 14,
+        "offset_z_2": 38,
+        "h_speed_2": 6,
+        "v_speed_2": 5,
+        "offset_x_3": -33,
+        "offset_y_3": 12,
+        "offset_z_3": 30,
+        "h_speed_3": 20,
+        "v_speed_3": 6,
+        "offset_x_4": -46,
+        "offset_y_4": -8,
+        "offset_z_4": 30,
+        "h_speed_4": 7,
+        "v_speed_4": 5,
+        "offset_x_5": 13,
+        "offset_y_5": 6,
+        "offset_z_5": 19,
+        "h_speed_5": 19,
+        "v_speed_5": 4,
+        "offset_x_6": 10,
+        "offset_y_6": -4,
+        "offset_z_6": 18,
+        "h_speed_6": 20,
+        "v_speed_6": 5
+    }
+}

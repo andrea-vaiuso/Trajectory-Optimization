@@ -22,7 +22,11 @@ def show2DWorld(world: World, grid_size, trajectory = None, A = None, B = None, 
         for i, pt in enumerate(all_targets[1:-1], 1):
             ax.scatter(pt[0], pt[1], color='red', s=30)
             ax.text(pt[0]+5, pt[1]+5, f"{i}", color='red', fontsize=8)
-    
+        
+        # Plot dashed line for the trajectory
+        traj_arr = np.array(trajectory)
+        ax.plot(traj_arr[:, 0], traj_arr[:, 1], 'k--', lw=1.5)
+
     ax.set_xlabel("X (m)")
     ax.set_ylabel("Y (m)")
     ax.set_title(f"2D World '{world.world_name}' XY")
