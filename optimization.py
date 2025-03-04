@@ -107,25 +107,30 @@ def build_dimensions(A, B, num_points, grid_step, max_world_size, perturbation_f
     return dimensions, x0
 
 
-def execute_simulation(drone: Drone, world: World, noise_model, A, B, custom_points, cost_gains, showplots=True, interval=30, log_folder="Logs"):
-    sim = Simulation(drone, world, noise_model)
+def execute_simulation(sim: Simulation, world: World, 
+                    A, B, custom_points, cost_gains, 
+                       showplots=True, interval=30, log_folder="Logs",
+                       dt=0.1, print_info = False, save_log = False, print_log = False
+                       ):
     noise_gain, altitude_gain, time_gain, distance_gain, power_gain = cost_gains
-    trajectory, _, log_data, all_targets, _ = sim.simulate_trajectory(
-        point_a=A, point_b=B, dt=0.1,
+    trajectory, total_cost, log_data, all_targets, simulation_completed = sim.simulate_trajectory(
+        point_a=A, point_b=B, dt=dt,
         horizontal_threshold=5.0, vertical_threshold=2.0,
         custom_points=custom_points,
-        print_log=False,
+        print_log=print_log,
         noise_rule_cost_gain=noise_gain,
         altitude_rule_cost_gain=altitude_gain,
         time_cost_gain=time_gain,
         distance_cost_gain=distance_gain,
         power_cost_gain=power_gain,
-        save_log=True,
-        save_log_folder=log_folder
+        save_log_folder=log_folder,
+        print_info=print_info,
+        save_log=save_log
     )
     if showplots:
         show2DWorld(world, world.grid_size, trajectory, A, B, all_targets, save=True, save_folder=log_folder)    
         showPlot(trajectory, A, B, all_targets, world, world.grid_size, world.max_world_size, log_data, interval=interval)
+    return trajectory, total_cost, log_data, all_targets, simulation_completed
 
 
 def animate_optimization_steps(world: World, grid_size, A, B, optimization_history, save_path):
@@ -261,20 +266,12 @@ def main():
         custom_points = generate_custom_points(param_list, A, B, num_points, grid_step, max_world_size)
         print(f"Iteration ({iterations}/{n_iterations}) | Best: {min(costs):.2f} | ", end="")
 
-        # Use a coarser dt here (dt=1) for faster evaluation.
-        trajectory, total_cost, _, all_targets, simulation_completed = sim.simulate_trajectory(
-            point_a=A, point_b=B, dt=1,
-            horizontal_threshold=5.0, vertical_threshold=2.0,
-            custom_points=custom_points,
-            print_log=False,
-            noise_rule_cost_gain=noise_gain,
-            altitude_rule_cost_gain=altitude_gain,
-            time_cost_gain=time_gain,
-            distance_cost_gain=distance_gain,
-            power_cost_gain=power_gain,
-            print_info=False,
-            save_log=False
+        trajectory, total_cost, log_data, all_targets, simulation_completed = execute_simulation(
+            sim, world, A, B, custom_points, cost_gains,
+            showplots=False, interval=30, log_folder="Logs",
+            dt=1, print_info=False, save_log=False
         )
+
         if simulation_completed:
             # Save the optimization step (iteration, trajectory, and intermediate targets)
             optimization_history.append((iterations, trajectory, all_targets))
@@ -326,26 +323,22 @@ def main():
     with open(f"{save_folder}/optimization_info.json", "w") as json_file:
         json.dump(optimization_info, json_file, indent=4)
     
-    # Create and save animation of the optimization steps.
-    anim_path = f"{save_folder}/optimization_animation.gif"
-    if optimization_history:
-        print("Creating animation of optimization steps...")
-        animate_optimization_steps(world, grid_size, A, B, optimization_history, anim_path)
-        print(f"Animation saved as {anim_path}")
-    else:
-        print("No completed simulation steps were recorded for animation.")
+    create_opt_ani = False
+    if create_opt_ani:
+        # Create and save animation of the optimization steps.
+        anim_path = f"{save_folder}/optimization_animation.gif"
+        if optimization_history:
+            print("Creating animation of optimization steps...")
+            animate_optimization_steps(world, grid_size, A, B, optimization_history, anim_path)
+            print(f"Animation saved as {anim_path}")
+        else:
+            print("No completed simulation steps were recorded for animation.")
     
     print("Executing simulation...")
     execute_simulation(
-        drone,
-        world,
-        angle_noise_model, 
-        A, B, 
-        custom_points_best, 
-        cost_gains,
-        showplots=True,
-        interval=30,
-        log_folder=save_folder
+        sim, world, A, B, custom_points_best, cost_gains,
+        showplots=True, interval=30, log_folder=save_folder,
+        dt=0.1, print_info=True, save_log=True, print_log=False
     )
 
 

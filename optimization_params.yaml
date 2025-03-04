@@ -1,7 +1,7 @@
 # Description: Optimization parameters for the drone trajectory optimization
 
 # Optimization Parameters
-n_iterations: 1000 # Number of optimization iterations
+n_iterations: 11 # Number of optimization iterations
 optimization_random_state: 4634 # Random state for optimization
 
 # World Parameters

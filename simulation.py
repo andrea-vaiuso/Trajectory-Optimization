@@ -10,7 +10,7 @@ import yaml
 
 def create_AtoB_custom_points(A, B, num_points):
     custom_points = []
-    for _ in range(1, num_points + 1):
+    for i in range(1, num_points + 1):
         new_point = {
             "x": A["x"] + (B["x"] - A["x"]) * i / (num_points + 1),
             "y": A["y"] + (B["y"] - A["y"]) * i / (num_points + 1),
@@ -98,5 +98,10 @@ if __name__ == "__main__":
 
     # Start simulation
     print("Simulating trajectory...")
-    execute_simulation(drone, world, angle_noise_model, A, B, custom_points, get_cost_gains(A, B, drone), log_folder="OptimizedTrajectory/2025-02-28_01-26-52")
+    sim = Simulation(drone, world, angle_noise_model)
+    execute_simulation(
+        sim, world, A, B, custom_points, get_cost_gains(A, B, drone),
+        showplots=True, interval=30, log_folder="OptimizedTrajectory/2025-02-28_01-26-52",
+        dt=0.1, print_info=True, save_log=True, print_log=False
+    )
 
