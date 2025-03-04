@@ -55,7 +55,6 @@ class Simulation:
 
         distAB = np.sqrt((point_b["x"] - point_a["x"])**2 + (point_b["y"] - point_a["y"])**2 + (point_b["z"] - point_a["z"])**2) * 1.1
         time_limit = distAB / np.sqrt(self.drone.max_horizontal_speed**2 + self.drone.max_vertical_speed**2) * time_limit_gain
-        if print_info: print(f"Time limit: {time_limit:.2f} seconds.")
 
         costs = {
             "noise": 0,

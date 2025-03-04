@@ -28,7 +28,6 @@ def get_cost_gains(A: dict, B: dict, drone: Drone):
     power_cost_gain = time_cost_gain / drone.hover_rpm
     return noise_rule_cost_gain, altitude_rule_cost_gain, time_cost_gain, distance_cost_gain, power_cost_gain
 
-
 def compute_base_point(t, A, B):
     """Compute the base point (linear interpolation) between A and B at fraction t."""
     return {
@@ -36,7 +35,6 @@ def compute_base_point(t, A, B):
         "y": A["y"] + t * (B["y"] - A["y"]),
         "z": A["z"] + t * (B["z"] - A["z"])
     }
-
 
 def generate_custom_points(param_list, A, B, num_points, grid_step, max_world_size):
     """
@@ -108,9 +106,9 @@ def build_dimensions(A, B, num_points, grid_step, max_world_size, perturbation_f
 
 
 def execute_simulation(sim: Simulation, world: World, 
-                    A, B, custom_points, cost_gains, 
-                       showplots=True, interval=30, log_folder="Logs",
-                       dt=0.1, print_info = False, save_log = False, print_log = False
+                        A, B, custom_points, cost_gains, 
+                        showplots=True, interval=30, log_folder="Logs",
+                        dt=0.1, print_info = False, save_log = False, print_log = False
                        ):
     noise_gain, altitude_gain, time_gain, distance_gain, power_gain = cost_gains
     trajectory, total_cost, log_data, all_targets, simulation_completed = sim.simulate_trajectory(
@@ -131,7 +129,6 @@ def execute_simulation(sim: Simulation, world: World,
         show2DWorld(world, world.grid_size, trajectory, A, B, all_targets, save=True, save_folder=log_folder)    
         showPlot(trajectory, A, B, all_targets, world, world.grid_size, world.max_world_size, log_data, interval=interval)
     return trajectory, total_cost, log_data, all_targets, simulation_completed
-
 
 def animate_optimization_steps(world: World, grid_size, A, B, optimization_history, save_path):
     """
@@ -214,38 +211,16 @@ def animate_optimization_steps(world: World, grid_size, A, B, optimization_histo
     
     plt.close(fig)
 
-
-def main():
+def optimize(params, world, drone):
     global iterations, costs, optimization_history
-    with open("optimization_params.yaml", "r") as file:
-        params = yaml.safe_load(file)
-
-    # Load parameters from YAML.
     grid_size = params["grid_size"]
     max_world_size = params["max_world_size"]
     num_points = params["num_points"]
     n_iterations = params["n_iterations"]
     perturbation_factor = params["perturbation_factor"]
     grid_step = params["grid_step"]
-    world_file_name = params["world_file_name"]
     A = params["A"]
     B = params["B"]
-
-    print("Loading world...")
-    world = World.load_world(world_file_name)
-
-    print("Creating drone...")
-    drone = Drone(
-        model_name=params["drone_model_name"],
-        x=A["x"],
-        y=A["y"],
-        z=A["z"],
-        min_RPM=params["min_RPM"],
-        max_RPM=params["max_RPM"],
-        hover_RPM=params["hover_RPM"],
-        max_horizontal_speed=params["max_horizontal_speed"],
-        max_vertical_speed=params["max_vertical_speed"]
-    )
 
     print("Loading noise model...")
     angle_noise_model = np.load(params["noise_model"])
@@ -334,13 +309,5 @@ def main():
         else:
             print("No completed simulation steps were recorded for animation.")
     
-    print("Executing simulation...")
-    execute_simulation(
-        sim, world, A, B, custom_points_best, cost_gains,
-        showplots=True, interval=30, log_folder=save_folder,
-        dt=0.1, print_info=True, save_log=True, print_log=False
-    )
+    return sim, world, A, B, custom_points_best, cost_gains, save_folder
 
-
-if __name__ == "__main__":
-    main()
