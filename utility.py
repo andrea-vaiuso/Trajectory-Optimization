@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from Entity.World import World
 
-def show2DWorld(world: World, grid_size, trajectory = None, A = None, B = None, all_targets = None, image_alpha = 0.7, save=False, save_folder="OptimizedTrajectory"):
+def show2DWorld(world: World, grid_size, trajectory=None, A=None, B=None, all_targets=None, image_alpha=0.7, save=False, save_folder="OptimizedTrajectory"):
     fig, ax = plt.subplots(figsize=(8, 6))
 
     # Add background image
@@ -13,7 +13,9 @@ def show2DWorld(world: World, grid_size, trajectory = None, A = None, B = None, 
 
     for (x, y, z), params in world.grid.items():
         if z == 0:
-            rect = plt.Rectangle((x * grid_size, y * grid_size), grid_size, grid_size, color=world.AREA_PARAMS[params]["color"], alpha=world.AREA_PARAMS[params]["alpha"])
+            rect = plt.Rectangle((x * grid_size, y * grid_size), grid_size, grid_size, 
+                                 color=world.AREA_PARAMS[params]["color"], 
+                                 alpha=world.AREA_PARAMS[params]["alpha"])
             ax.add_patch(rect)
 
     if trajectory is not None:
@@ -21,7 +23,7 @@ def show2DWorld(world: World, grid_size, trajectory = None, A = None, B = None, 
         ax.scatter(B["x"], B["y"], color='blue', s=50, label="B (Target)")
         for i, pt in enumerate(all_targets[1:-1], 1):
             ax.scatter(pt[0], pt[1], color='red', s=30)
-            ax.text(pt[0]+5, pt[1]+5, f"{i}", color='red', fontsize=8)
+            ax.text(pt[0] + 5, pt[1] + 5, f"{i}", color='red', fontsize=8)
         
         # Plot dashed line for the trajectory
         traj_arr = np.array(trajectory)
@@ -37,6 +39,7 @@ def show2DWorld(world: World, grid_size, trajectory = None, A = None, B = None, 
     if save:
         plt.savefig(f"{save_folder}/trajectory_{world.world_name}.png", dpi=300)
     plt.show()
+
 
 def showPlot(trajectory, A, B, all_targets, world: World, grid_size, max_world_size, log_data, interval=1):
     traj_arr = np.array(trajectory)

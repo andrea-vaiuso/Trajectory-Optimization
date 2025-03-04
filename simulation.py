@@ -94,9 +94,9 @@ if __name__ == "__main__":
     print("Creating custom points...")
     #custom_points = load_custom_points("OptimizedTrajectory/2025-02-14_08-58-00/optimization_info.json")
     #custom_points = load_custom_points("OptimizedTrajectory/2025-02-11_20-55-31_optimization_info.json")
-    custom_points = load_custom_points_npy("OptimizedTrajectory/2025-02-21_15-25-19/bestpoints.npy")
+    custom_points = load_custom_points_npy("OptimizedTrajectory/2025-02-28_01-26-52/bestpoints.npy")
 
     # Start simulation
     print("Simulating trajectory...")
-    execute_simulation(drone, world, angle_noise_model, A, B, custom_points, get_cost_gains(A, B, drone), log_folder="OptimizedTrajectory/2025-02-21_15-25-19")
+    execute_simulation(drone, world, angle_noise_model, A, B, custom_points, get_cost_gains(A, B, drone), log_folder="OptimizedTrajectory/2025-02-28_01-26-52")
 

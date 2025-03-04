@@ -9,12 +9,14 @@ from skopt.space import Integer, Real
 from Entity.Simulation import Simulation
 from Entity.World import World
 from Entity.Drone import Drone
+from matplotlib import pyplot as plt
+import matplotlib.animation as animation
 from utility import showPlot, plotCosts, show2DWorld
 
-# Global optimization counters
+# Global optimization counters and history
 iterations = 0
 costs = [1e9]
-
+optimization_history = []  # Will store tuples: (iteration, trajectory, all_targets)
 
 def get_cost_gains(A: dict, B: dict, drone: Drone):
     distAB = np.sqrt((B["x"] - A["x"])**2 + (B["y"] - A["y"])**2 + (B["z"] - A["z"])**2) * 1.1
@@ -126,8 +128,90 @@ def execute_simulation(drone: Drone, world: World, noise_model, A, B, custom_poi
         showPlot(trajectory, A, B, all_targets, world, world.grid_size, world.max_world_size, log_data, interval=interval)
 
 
+def animate_optimization_steps(world: World, grid_size, A, B, optimization_history, save_path):
+    """
+    Create an animation of the optimization steps.
+    The background (grid and background image) is plotted once.
+    For each frame the trajectory (and intermediate targets) is updated.
+    The plot title is updated to show the current optimization step.
+    """
+    fig, ax = plt.subplots(figsize=(8, 6))
+    
+    # Plot static background image (if available)
+    if world.background_image is not None:
+        bg_img = np.array(world.background_image)
+        ax.imshow(bg_img, extent=[0, world.max_world_size, 0, world.max_world_size],
+                  origin='lower', alpha=0.7, zorder=-1)
+    
+    # Plot grid (static)
+    for (x, y, z), params in world.grid.items():
+        if z == 0:
+            rect = plt.Rectangle((x * grid_size, y * grid_size), grid_size, grid_size,
+                                 color=world.AREA_PARAMS[params]["color"],
+                                 alpha=world.AREA_PARAMS[params]["alpha"])
+            ax.add_patch(rect)
+    
+    # Plot static start and target points
+    ax.scatter(A["x"], A["y"], color='green', s=50, label="A (Start)")
+    ax.scatter(B["x"], B["y"], color='blue', s=50, label="B (Target)")
+    
+    # Create dynamic objects for intermediate targets and trajectory
+    targets_scatter = ax.scatter([], [], color='red', s=30)
+    traj_line, = ax.plot([], [], 'k--', lw=1.5)
+    
+    ax.set_xlabel("X (m)")
+    ax.set_ylabel("Y (m)")
+    ax.set_xlim(0, world.max_world_size)
+    ax.set_ylim(0, world.max_world_size)
+    ax.legend(loc='upper left')
+    ax.grid(True)
+    
+    # Precompute the data arrays for each frame
+    precomputed = []
+    for step, traj, all_targets in optimization_history:
+        if traj and len(traj) > 0:
+            traj_arr = np.array(traj)
+        else:
+            traj_arr = np.empty((0, 2))
+        if all_targets is not None and len(all_targets) > 2:
+            pts = np.array(all_targets[1:-1])[:, :2]
+        else:
+            pts = np.empty((0, 2))
+        precomputed.append((step, traj_arr, pts))
+    
+    def init():
+        traj_line.set_data([], [])
+        targets_scatter.set_offsets(np.empty((0, 2)))
+        ax.set_title("Optimization Step: 0")
+        return traj_line, targets_scatter,
+
+    def update(frame):
+        step, traj_arr, pts = precomputed[frame]
+        # Update trajectory line if available
+        if traj_arr.size > 0:
+            traj_line.set_data(traj_arr[:, 0], traj_arr[:, 1])
+        else:
+            traj_line.set_data([], [])
+        targets_scatter.set_offsets(pts)
+        ax.set_title(f"Optimization Step: {step}/{len(precomputed)}")
+        return traj_line, targets_scatter,
+    
+    ani = animation.FuncAnimation(fig, update, frames=len(precomputed),
+                                  init_func=init, blit=True, interval=500)
+    
+    # Optionally switch to the 'ffmpeg' writer if available for better performance:
+    try:
+        ani.save(save_path, writer='ffmpeg', fps=25, dpi=300)
+    except Exception as e:
+        # Fall back to Pillow writer if ffmpeg is not available.
+        print("FFmpeg writer failed, falling back to Pillow writer:", e)
+        ani.save(save_path, writer='pillow', fps=25, dpi=300)
+    
+    plt.close(fig)
+
+
 def main():
-    global iterations, costs
+    global iterations, costs, optimization_history
     with open("optimization_params.yaml", "r") as file:
         params = yaml.safe_load(file)
 
@@ -171,14 +255,14 @@ def main():
     # The cost function for optimization.
     def cost_function(param_list):
         nonlocal sim, A, B, num_points, grid_step, max_world_size, noise_gain, altitude_gain, time_gain, distance_gain, power_gain
-        global iterations, costs
+        global iterations, costs, optimization_history
         iterations += 1
 
         custom_points = generate_custom_points(param_list, A, B, num_points, grid_step, max_world_size)
         print(f"Iteration ({iterations}/{n_iterations}) | Best: {min(costs):.2f} | ", end="")
 
         # Use a coarser dt here (dt=1) for faster evaluation.
-        _, total_cost, _, _, simulation_completed = sim.simulate_trajectory(
+        trajectory, total_cost, _, all_targets, simulation_completed = sim.simulate_trajectory(
             point_a=A, point_b=B, dt=1,
             horizontal_threshold=5.0, vertical_threshold=2.0,
             custom_points=custom_points,
@@ -191,6 +275,9 @@ def main():
             print_info=False,
             save_log=False
         )
+        if simulation_completed:
+            # Save the optimization step (iteration, trajectory, and intermediate targets)
+            optimization_history.append((iterations, trajectory, all_targets))
         costs.append(total_cost if simulation_completed else np.nan)
         return total_cost
 
@@ -209,8 +296,9 @@ def main():
 
     # Save best trajectory information.
     time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    os.makedirs(f"OptimizedTrajectory/{time_str}", exist_ok=True)
-    np.save(f"OptimizedTrajectory/{time_str}/bestpoints.npy", custom_points_best)
+    save_folder = f"OptimizedTrajectory/{time_str}"
+    os.makedirs(save_folder, exist_ok=True)
+    np.save(f"{save_folder}/bestpoints.npy", custom_points_best)
     plotCosts(costs[1:], save=True, datetime=time_str)
 
     optimization_info = {
@@ -235,8 +323,17 @@ def main():
         "world_file_name": world.world_name
     }
 
-    with open(f"OptimizedTrajectory/{time_str}/optimization_info.json", "w") as json_file:
+    with open(f"{save_folder}/optimization_info.json", "w") as json_file:
         json.dump(optimization_info, json_file, indent=4)
+    
+    # Create and save animation of the optimization steps.
+    anim_path = f"{save_folder}/optimization_animation.gif"
+    if optimization_history:
+        print("Creating animation of optimization steps...")
+        animate_optimization_steps(world, grid_size, A, B, optimization_history, anim_path)
+        print(f"Animation saved as {anim_path}")
+    else:
+        print("No completed simulation steps were recorded for animation.")
     
     print("Executing simulation...")
     execute_simulation(
@@ -248,7 +345,7 @@ def main():
         cost_gains,
         showplots=True,
         interval=30,
-        log_folder=f"OptimizedTrajectory/{time_str}"
+        log_folder=save_folder
     )
 
 

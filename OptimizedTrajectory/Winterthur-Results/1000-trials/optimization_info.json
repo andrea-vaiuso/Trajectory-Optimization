@@ -1,0 +1,94 @@
+{
+    "n_iterations": 1000,
+    "best_cost": 17.638308021214293,
+    "optimization_time_seconds": 139174.25031852722,
+    "n_points": 7,
+    "custom_points": [
+        {
+            "x": 6.0,
+            "y": 6.0,
+            "z": 128.0,
+            "h_speed": 17.303660381626898,
+            "v_speed": 8.0
+        },
+        {
+            "x": 285.0,
+            "y": 82.0,
+            "z": 261.0,
+            "h_speed": 17.12950094043515,
+            "v_speed": 8.0
+        },
+        {
+            "x": 319.0,
+            "y": 81.0,
+            "z": 275.0,
+            "h_speed": 14.335465025425751,
+            "v_speed": 4.6035193590546815
+        },
+        {
+            "x": 493.0,
+            "y": 150.0,
+            "z": 331.0,
+            "h_speed": 20.0,
+            "v_speed": 7.514525765801657
+        },
+        {
+            "x": 975.0,
+            "y": 513.0,
+            "z": 366.0,
+            "h_speed": 20.0,
+            "v_speed": 7.089731031002425
+        },
+        {
+            "x": 995.0,
+            "y": 547.0,
+            "z": 352.0,
+            "h_speed": 11.888630373304393,
+            "v_speed": 4.9336021400866485
+        },
+        {
+            "x": 994.0,
+            "y": 847.0,
+            "z": 184.0,
+            "h_speed": 18.948638079748196,
+            "v_speed": 8.0
+        }
+    ],
+    "A": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 100.0,
+        "h_speed": 20.0,
+        "v_speed": 8.0
+    },
+    "B": {
+        "x": 1000.0,
+        "y": 1000.0,
+        "z": 100.0,
+        "h_speed": 20.0,
+        "v_speed": 8.0
+    },
+    "grid_size": 10,
+    "max_world_size": 1000,
+    "perturbation_factor": 0.25,
+    "grid_step": 7,
+    "noise_rule_cost_gain": 1.0,
+    "altitude_rule_cost_gain": 1.0,
+    "time_cost_gain": 0.01384686019247983,
+    "distance_cost_gain": 0.0006428243465332249,
+    "power_cost_gain": 5.128466737955492e-06,
+    "drone": {
+        "model_name": "DJI Matrice 300 RTK",
+        "min_RPM": 2100,
+        "max_RPM": 5000,
+        "hover_rpm": 2700,
+        "max_horizontal_speed": 20.0,
+        "max_vertical_speed": 8.0,
+        "vertical_decel_distance": 15,
+        "vertical_accel_distance": 10,
+        "horiz_decel_distance": 15,
+        "horiz_accel_distance": 10
+    },
+    "angle_noise_model": "dnn_sound_model/angles_swl.npy",
+    "world_file_name": "Winterthur Area"
+}
