@@ -11,12 +11,23 @@ def main():
     print("Loading world...")
     world = World.load_world(params["world_file_name"])
 
-    print("Creating drone...")
-    drone = Drone(
+    print("Creating drones...")
+    drone_1 = Drone(
         model_name=params["drone_model_name"],
-        x=params["A"]["x"],
-        y=params["A"]["y"],
-        z=params["A"]["z"],
+        x=params["A"][0]["x"],
+        y=params["A"][0]["y"],
+        z=params["A"][0]["z"],
+        min_RPM=params["min_RPM"],
+        max_RPM=params["max_RPM"],
+        hover_RPM=params["hover_RPM"],
+        max_horizontal_speed=params["max_horizontal_speed"],
+        max_vertical_speed=params["max_vertical_speed"]
+    )
+    drone_2 = Drone(
+        model_name=params["drone_model_name"],
+        x=params["A"][1]["x"],
+        y=params["A"][1]["y"],
+        z=params["A"][1]["z"],
         min_RPM=params["min_RPM"],
         max_RPM=params["max_RPM"],
         hover_RPM=params["hover_RPM"],
@@ -24,7 +35,9 @@ def main():
         max_vertical_speed=params["max_vertical_speed"]
     )
 
-    sim, world, A, B, custom_points_best, cost_gains, save_folder = optimize(params, world, drone)
+    drones = [drone_1, drone_2]
+
+    sim, world, A, B, custom_points_best, cost_gains, save_folder = optimize(params, world, drones)
 
     print("Executing simulation...")
     execute_simulation(

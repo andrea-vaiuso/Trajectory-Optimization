@@ -2,31 +2,32 @@ import numpy as np
 import time
 import datetime
 import csv
-import numpy as np
 import math
 from Entity.Drone import Drone
 from Entity.World import World
 
-
-# --------------- Simulation Class (with CSV Logging and Plotting) ---------------
 class Simulation:
-    def __init__(self, drone: Drone, world: World, noise_model: np.ndarray = None):
-        self.drone = drone
+    def __init__(self, drones: list, world: World, noise_model: np.ndarray = None):
+        self.drones = drones
         self.world = world
         self.noise_model = noise_model
 
-    def generate_intermediate_points(self, point_a, point_b, custom_points):
-        points = []
-        points.append([point_a["x"],point_a["y"],point_a["z"],point_a["h_speed"],point_a["v_speed"]])
-        for p in custom_points:
-            points.append([p["x"],p["y"],p["z"],p["h_speed"],p["v_speed"]])
-        points.append([point_b["x"],point_b["y"],point_b["z"],point_b["h_speed"],point_b["v_speed"]])
-        return points
+    def generate_intermediate_points_for_all(self, points_a, points_b, custom_points_all):
+        # For each drone, generate list of waypoints: [start] + custom_points + [target]
+        targets_all = []
+        for a, b, custom_points in zip(points_a, points_b, custom_points_all):
+            targets = []
+            targets.append([a["x"], a["y"], a["z"], a["h_speed"], a["v_speed"]])
+            for p in custom_points:
+                targets.append([p["x"], p["y"], p["z"], p["h_speed"], p["v_speed"]])
+            targets.append([b["x"], b["y"], b["z"], b["h_speed"], b["v_speed"]])
+            targets_all.append(targets)
+        return targets_all
 
     def simulate_trajectory(self, 
-                            point_a, 
-                            point_b,
-                            custom_points,
+                            points_a, 
+                            points_b,
+                            custom_points_all,
                             dt=0.1, 
                             horizontal_threshold=5.0, 
                             vertical_threshold=2.0,
@@ -37,128 +38,151 @@ class Simulation:
                             time_cost_gain=1.0,
                             distance_cost_gain=1.0,
                             power_cost_gain=1.0,
+                            collision_threshold=2.0,
+                            collision_cost_gain=1e6,
                             time_limit_gain=10,
                             save_log=True,
                             save_log_folder="Logs",
-                            print_info=True,
-                            ):
-        self.drone.set_position(point_a["x"], point_a["y"], point_a["z"])
-        simulation_completed = True
-        start_time = time.time()
-        targets = self.generate_intermediate_points(point_a, point_b, custom_points)
-        all_targets = targets.copy()
-        trajectory = [self.drone.position.copy()]
-        total_distance = 0.0  
-        t_elapsed = 0
-        log_data = []  # Log: time, pos, pitch, yaw, rpms, velocity
-        noise_model_update_frequency = 3  # Update noise model
-
-        distAB = np.sqrt((point_b["x"] - point_a["x"])**2 + (point_b["y"] - point_a["y"])**2 + (point_b["z"] - point_a["z"])**2) * 1.1
-        time_limit = distAB / np.sqrt(self.drone.max_horizontal_speed**2 + self.drone.max_vertical_speed**2) * time_limit_gain
-
-        costs = {
-            "noise": 0,
-            "altitude": 0,
-            "time": 0,
-            "distance": 0,
-            "power": 0
-        }
-
-        total_avg_spl = []
-        total_avg_noise_costs = []
-        total_avg_altitude_costs = []
-
-        while targets:
-            if t_elapsed > time_limit:
-                break
-            target = targets[0]
-            horizontal_err = np.linalg.norm(self.drone.position[:2] - target[:2])
-            vertical_err = abs(self.drone.position[2] - target[2])
-            while horizontal_err > horizontal_threshold or vertical_err > vertical_threshold:
-                previous_position = self.drone.position.copy()
-                pitch, yaw, rpms, pos, vel = self.drone.update_control(target, dt)
-                noise_cost = 0
-                altitude_cost = 0
-                if self.noise_model is not None and int(t_elapsed % noise_model_update_frequency) == 0:
-                    ground_areas, ground_parameters = self.world.get_areas_in_circle(int(pos[0]), int(pos[1]), 1, noise_annoyance_radius)
-                    average_spl = 0
-                    average_noise_cost = 0
-                    average_altitude_cost = 0
-                    for i in range(len(ground_areas)):
-                        x, y, _ = ground_areas[i]
-                        # Compute distance between drone and area center
-                        distance = np.linalg.norm(pos - np.array([x, y, 0]))
-                        # Calculate radiation angle
-                        zeta = np.arctan2(abs(pos[2]), distance)
-                        # Calculate sound power level
-                        swl_ref_rpm = self.noise_model[int(zeta * 180 / np.pi)]
-                        # Set SWL depending on drone RPM
-                        swl = swl_ref_rpm + 10 * np.log10(rpms[0] / self.drone.hover_rpm)
-                        # Calculate sound pressure level
-                        spl = swl - abs(10 * np.log10(1/4*np.pi*(distance+1e-4)**2))
-                        average_spl += spl
-                        #print(spl)
-                        # Check if area rules are violated
-                        if ground_parameters[i] != {}:
-                            average_noise_cost += spl * ground_parameters[i]["noise_penalty"]
-                            average_altitude_cost += max(pos[2] - ground_parameters[i]["max_altitude"], 0)
-                            average_altitude_cost += max(ground_parameters[i]["min_altitude"] - pos[2], 0)  
-
-                    average_noise_cost /= len(ground_areas)
-                    average_altitude_cost /= len(ground_areas)
-                    average_spl /= len(ground_areas)
-                    total_avg_spl.append(average_spl)
-                    total_avg_noise_costs.append(average_noise_cost)
-                    total_avg_altitude_costs.append(average_altitude_cost)
-                
-                noise_cost += np.average(total_avg_noise_costs) * noise_model_update_frequency
-                altitude_cost += np.average(total_avg_altitude_costs) * noise_model_update_frequency
-
-                step_distance = np.linalg.norm(self.drone.position - previous_position)
-                total_distance += step_distance
-                trajectory.append(self.drone.position.copy())
-                t_elapsed += dt
-                horizontal_err = np.linalg.norm(self.drone.position[:2] - target[:2])
-                vertical_err = abs(self.drone.position[2] - target[2])
-                log_text = [round(t_elapsed, 2), pos[0], pos[1], pos[2],
-                                 round(pitch, 2), round(yaw, 2),
-                                 int(rpms[0]), int(rpms[1]), int(rpms[2]), int(rpms[3]),
-                                 round(vel[0], 2), round(vel[1], 2), round(vel[2], 2), round(self.drone.horizontal_speed,2)]
-                log_data.append(log_text)
-                if print_log: print(log_text)
-            self.drone.target_history.append(target)
-            targets.pop(0)
-        if print_info: print(f"Total average noise: {np.average(total_avg_spl)} dB")
-            
+                            print_info=True
+                           ):
+        n_drones = len(self.drones)
+        # Set initial positions for all drones
+        for i, drone in enumerate(self.drones):
+            a = points_a[i]
+            drone.set_position(a["x"], a["y"], a["z"])
+            drone.target_history = []
         
-        elapsed = time.time() - start_time
-        costs["distance"] += total_distance ** 1.3 * distance_cost_gain
-        costs["time"] += t_elapsed ** 1.3 * time_cost_gain
-        costs["power"] += np.average(log_data, axis=0)[6:10].sum() * t_elapsed * power_cost_gain
-        costs["noise"] += noise_cost * noise_rule_cost_gain
-        costs["altitude"] += altitude_cost * altitude_rule_cost_gain
+        targets_all = self.generate_intermediate_points_for_all(points_a, points_b, custom_points_all)
+        # Initialize trajectories: list for each drone
+        trajectories = [[drone.position.copy()] for drone in self.drones]
+        # Initialize log data: list of dict entries per time step
+        log_data = []
+        # Initialize cost accumulators for each drone
+        total_distances = [0.0 for _ in range(n_drones)]
+        # Time limits per drone
+        time_limits = []
+        for i, drone in enumerate(self.drones):
+            a = points_a[i]
+            b = points_b[i]
+            distAB = np.sqrt((b["x"] - a["x"])**2 + (b["y"] - a["y"])**2 + (b["z"] - a["z"])**2) * 1.1
+            maxvel = np.sqrt(drone.max_horizontal_speed**2 + drone.max_vertical_speed**2)
+            time_limits.append(distAB / maxvel * time_limit_gain)
+        global_time_limit = max(time_limits)
 
-        if t_elapsed > time_limit:
-                costs["distance"] *= 9e4
-                costs["time"] *= 9e4
-                costs["power"] *= 9e4
+        simulation_completed = True
+        t_elapsed = 0.0
+        # Initialize cost components for each drone
+        costs = [{"noise": 0, "altitude": 0, "time": 0, "distance": 0, "power": 0} for _ in range(n_drones)]
+        collision_cost_total = 0.0
+
+        noise_model_update_frequency = 3
+
+        # Main simulation loop, run until all drones have finished their targets or time limit exceeded
+        while any(len(targets) > 1 for targets in targets_all):
+            if t_elapsed > global_time_limit:
                 simulation_completed = False
+                break
 
-        total_cost = np.sqrt(sum([v**2 for k, v in costs.items()]))
-        total_cost_print = total_cost
-        if not simulation_completed:
-            total_cost_print = np.nan
-        if print_info: print(f"Total cost: {total_cost:.2f}")
-        if print_info: print(f"Cost breakdown: {costs}")
+            positions = []  # Current positions of all drones
+            # For each drone, update if not reached current target
+            for i, drone in enumerate(self.drones):
+                targets = targets_all[i]
+                # If only one target remains, drone has finished
+                if len(targets) <= 1:
+                    positions.append(drone.position.copy())
+                    continue
+                current_target = targets[0]
+                horizontal_err = np.linalg.norm(drone.position[:2] - np.array(current_target[:2]))
+                vertical_err = abs(drone.position[2] - current_target[2])
+                if horizontal_err > horizontal_threshold or vertical_err > vertical_threshold:
+                    previous_position = drone.position.copy()
+                    pitch, yaw, rpms, pos, vel = drone.update_control(current_target, dt)
+                    step_distance = np.linalg.norm(drone.position - previous_position)
+                    total_distances[i] += step_distance
+                    # Noise and altitude cost calculation
+                    noise_cost = 0
+                    altitude_cost = 0
+                    if self.noise_model is not None and int(t_elapsed % noise_model_update_frequency) == 0:
+                        ground_areas, ground_parameters = self.world.get_areas_in_circle(int(pos[0]), int(pos[1]), 1, noise_annoyance_radius)
+                        avg_noise = 0
+                        avg_altitude = 0
+                        for j in range(len(ground_areas)):
+                            x, y, _ = ground_areas[j]
+                            distance = np.linalg.norm(pos - np.array([x, y, 0]))
+                            zeta = np.arctan2(abs(pos[2]), distance)
+                            swl_ref_rpm = self.noise_model[int(zeta * 180 / np.pi)]
+                            swl = swl_ref_rpm + 10 * np.log10(rpms[0] / drone.hover_rpm)
+                            spl = swl - abs(10 * np.log10(1/4*np.pi*(distance+1e-4)**2))
+                            avg_noise += spl
+                            if ground_parameters[j] != {}:
+                                avg_altitude += max(pos[2] - ground_parameters[j]["max_altitude"], 0)
+                                avg_altitude += max(ground_parameters[j]["min_altitude"] - pos[2], 0)
+                        avg_noise /= len(ground_areas)
+                        avg_altitude /= len(ground_areas)
+                        noise_cost += avg_noise * noise_model_update_frequency
+                        altitude_cost += avg_altitude * noise_model_update_frequency
+                    costs[i]["distance"] = total_distances[i] ** 1.3 * distance_cost_gain
+                    costs[i]["time"] = t_elapsed ** 1.3 * time_cost_gain
+                    costs[i]["power"] += np.sum(rpms) * dt * power_cost_gain
+                    costs[i]["noise"] += noise_cost * noise_rule_cost_gain
+                    costs[i]["altitude"] += altitude_cost * altitude_rule_cost_gain
 
-        print(f"Sim_time: {elapsed:.2f}s | Flight_time: {t_elapsed:.2f}s | Dist: {total_distance:.2f}m | Cost: {total_cost_print:.2f}")
+                    # Log data for this drone
+                    log_entry = {
+                        "time": round(t_elapsed, 2),
+                        "drone_index": i,
+                        "position": pos.tolist(),
+                        "pitch": round(pitch, 2),
+                        "yaw": round(yaw, 2),
+                        "rpms": [int(r) for r in rpms],
+                        "velocity": [round(v, 2) for v in vel],
+                        "horizontal_speed": round(drone.horizontal_speed,2)
+                    }
+                    log_data.append(log_entry)
+                else:
+                    # Target reached, pop target and record in target history
+                    drone.target_history.append(targets.pop(0))
+                positions.append(drone.position.copy())
+                trajectories[i].append(drone.position.copy())
 
+            # Collision detection among drones
+            for i in range(n_drones):
+                for j in range(i+1, n_drones):
+                    dist_between = np.linalg.norm(np.array(trajectories[i][-1]) - np.array(trajectories[j][-1]))
+                    if dist_between < collision_threshold:
+                        collision_cost_total += collision_cost_gain
+
+            t_elapsed += dt
+
+        # Aggregate total cost from all drones
+        total_cost_components = np.array([sum(costs[i].values()) for i in range(n_drones)]) + collision_cost_total
+        total_cost = np.sqrt(np.sum(total_cost_components**2))
+
+        if t_elapsed > global_time_limit:
+            total_cost = np.nan
+            simulation_completed = False
+
+        if print_info:
+            print(f"Total simulation time: {t_elapsed:.2f}s")
+            print(f"Total distances: {total_distances}")
+            print(f"Collision cost: {collision_cost_total}")
+            print(f"Total cost: {total_cost:.2f}")
+        
+        # Save log if required
         if save_log:
-            csv_filename = f"{save_log_folder}/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_drone_log.csv"
+            csv_filename = f"{save_log_folder}/{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_drones_log.csv"
             with open(csv_filename, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(["Time(s)", "X", "Y", "Z", "Pitch", "Yaw", "FL", "FR", "RL", "RR", "Vx", "Vy", "Vz", "Hor_Speed"])
-                writer.writerows(log_data)
+                header = ["Time(s)"]
+                for i in range(n_drones):
+                    header.extend([f"Drone{i}_X", f"Drone{i}_Y", f"Drone{i}_Z", f"Drone{i}_Pitch", f"Drone{i}_Yaw", f"Drone{i}_RPMs", f"Drone{i}_Velocity", f"Drone{i}_HorSpeed"])
+                writer.writerow(header)
+                # Group log entries by time steps
+                # This is a simple approach, not fully synchronized across drones
+                for entry in log_data:
+                    row = [entry["time"], entry["position"][0], entry["position"][1], entry["position"][2],
+                           entry["pitch"], entry["yaw"], entry["rpms"], entry["velocity"], entry["horizontal_speed"]]
+                    writer.writerow(row)
             print(f"Log saved to {csv_filename}.")
 
-        return trajectory, total_cost, log_data, all_targets, simulation_completed
+        return trajectories, total_cost, log_data, targets_all, simulation_completed
