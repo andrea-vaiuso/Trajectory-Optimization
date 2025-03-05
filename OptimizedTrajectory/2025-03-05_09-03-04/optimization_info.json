@@ -1,0 +1,139 @@
+{
+    "n_iterations": 11,
+    "best_cost": 2871.011795638496,
+    "optimization_time_seconds": 10.641939878463745,
+    "n_points": 4,
+    "custom_points": [
+        [
+            {
+                "x": 466.0,
+                "y": 515.0,
+                "z": 352.0,
+                "h_speed": 15.03482382071343,
+                "v_speed": 5.903433107182273
+            },
+            {
+                "x": 309.0,
+                "y": 708.0,
+                "z": 436.0,
+                "h_speed": 9.258814621061987,
+                "v_speed": 4.526819301721968
+            },
+            {
+                "x": 593.0,
+                "y": 565.0,
+                "z": 450.0,
+                "h_speed": 7.638878790160181,
+                "v_speed": 3.0903768180776043
+            },
+            {
+                "x": 723.0,
+                "y": 548.0,
+                "z": 163.0,
+                "h_speed": 16.162557845848436,
+                "v_speed": 6.604699621260647
+            }
+        ],
+        [
+            {
+                "x": 618.0,
+                "y": 744.0,
+                "z": 233.0,
+                "h_speed": 14.544989272788433,
+                "v_speed": 4.252309093027921
+            },
+            {
+                "x": 663.0,
+                "y": 936.0,
+                "z": 219.0,
+                "h_speed": 18.591481815778316,
+                "v_speed": 5.171971827552143
+            },
+            {
+                "x": 295.0,
+                "y": 505.0,
+                "z": 303.0,
+                "h_speed": 17.96251347607855,
+                "v_speed": 4.150926341207777
+            },
+            {
+                "x": 277.0,
+                "y": 319.0,
+                "z": 345.0,
+                "h_speed": 5.654056576316506,
+                "v_speed": 7.972752553986706
+            }
+        ]
+    ],
+    "A": [
+        {
+            "x": 0,
+            "y": 0,
+            "z": 100,
+            "h_speed": 20,
+            "v_speed": 8
+        },
+        {
+            "x": 1000,
+            "y": 1000,
+            "z": 100,
+            "h_speed": 20,
+            "v_speed": 8
+        }
+    ],
+    "B": [
+        {
+            "x": 1000,
+            "y": 1000,
+            "z": 100,
+            "h_speed": 20,
+            "v_speed": 8
+        },
+        {
+            "x": 0,
+            "y": 0,
+            "z": 100,
+            "h_speed": 20,
+            "v_speed": 8
+        }
+    ],
+    "grid_size": 10,
+    "max_world_size": 1000,
+    "perturbation_factor": 0.25,
+    "grid_step": 7,
+    "noise_rule_cost_gain": 1.0,
+    "altitude_rule_cost_gain": 1.0,
+    "time_cost_gain": 0.01384686019247983,
+    "distance_cost_gain": 0.0006428243465332249,
+    "power_cost_gain": 5.128466737955492e-06,
+    "drones": [
+        {
+            "model_name": "DJI Matrice 300 RTK",
+            "min_RPM": 2100,
+            "max_RPM": 5000,
+            "hover_rpm": 2700,
+            "max_horizontal_speed": 20.0,
+            "max_vertical_speed": 8.0,
+            "vertical_decel_distance": 15,
+            "vertical_accel_distance": 10,
+            "horiz_decel_distance": 15,
+            "horiz_accel_distance": 10
+        },
+        {
+            "model_name": "DJI Matrice 300 RTK",
+            "min_RPM": 2100,
+            "max_RPM": 5000,
+            "hover_rpm": 2700,
+            "max_horizontal_speed": 20.0,
+            "max_vertical_speed": 8.0,
+            "vertical_decel_distance": 15,
+            "vertical_accel_distance": 10,
+            "horiz_decel_distance": 15,
+            "horiz_accel_distance": 10
+        }
+    ],
+    "angle_noise_model": "dnn_sound_model/angles_swl.npy",
+    "world_file_name": "Winterthur Area",
+    "collision_distance": 2.0,
+    "collision_cost": 1000000.0
+}

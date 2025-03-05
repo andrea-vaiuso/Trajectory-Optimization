@@ -1,8 +1,8 @@
 # Description: Optimization parameters for the drone trajectory optimization
 
 # Optimization Parameters
-n_iterations: 150 # Number of optimization iterations
-optimization_random_state: 4634 # Random state for optimization
+n_iterations: 80 # Number of optimization iterations
+optimization_random_state: 42 # Random state for optimization
 
 # World Parameters
 grid_size: 10 # Grid size (in meters) This determines the areas where the noise effect is calculated
@@ -22,8 +22,8 @@ max_vertical_speed: 8.0 # Maximum manufacturer vertical speed (in m/s)
 noise_model: "dnn_sound_model/angles_swl.npy" # Noise model file name
 
 # Trajectory Parameters
-num_points: 7 # Number of intermediate points
+num_points: 4 # Number of intermediate points
 perturbation_factor: 0.25 # Perturbation factor for the maximum offset starting from the distance between A and B
 enforce_monotonic_xy: True # Enforce monotonicity in x and y coordinates
-A: [{"x": 0, "y": 0, "z": 100, "h_speed": 20, "v_speed": 8}, {"x": 0, "y": 500, "z": 100, "h_speed": 20, "v_speed": 8}] # Starting Point A
+A: [{"x": 0, "y": 0, "z": 100, "h_speed": 20, "v_speed": 8}, {"x": 0, "y": 1000, "z": 100, "h_speed": 20, "v_speed": 8}] # Starting Point A
 B: [{"x": 1000, "y": 1000, "z": 100, "h_speed": 20, "v_speed": 8}, {"x": 1000, "y": 0, "z": 100, "h_speed": 20, "v_speed": 8}] # Ending Point B
