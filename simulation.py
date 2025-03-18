@@ -2,10 +2,9 @@ import numpy as np
 from Entity.Simulation import Simulation
 from Entity.World import World
 from Entity.Drone import Drone
-from utility import showPlot, show2DWorld
-from Old_scripts.optimization import get_cost_gains
+from utility import show3DAnimation, show2DWorld
 import json
-from optimization import execute_simulation
+from optimization import execute_simulation, get_cost_gains
 import yaml
 
 def create_AtoB_custom_points(A, B, num_points):
@@ -69,8 +68,8 @@ if __name__ == "__main__":
     perturbation_factor = params["perturbation_factor"]
     grid_step = params["grid_step"]
     world_file_name = params["world_file_name"]
-    A = params["A"]
-    B = params["B"]
+    A = {"x": 0, "y": 0, "z": 100, "h_speed": 20, "v_speed": 8} # Starting Point A
+    B = {"x": 1000, "y": 1000, "z": 100, "h_speed": 20, "v_speed": 8} # Ending Point B
 
     print("Loading world...")
     world = World.load_world(world_file_name)
@@ -94,14 +93,17 @@ if __name__ == "__main__":
     print("Creating custom points...")
     #custom_points = load_custom_points("OptimizedTrajectory/2025-02-14_08-58-00/optimization_info.json")
     #custom_points = load_custom_points("OptimizedTrajectory/2025-02-11_20-55-31_optimization_info.json")
-    custom_points = load_custom_points_npy("OptimizedTrajectory/2025-02-28_01-26-52/bestpoints.npy")
+    #custom_points = load_custom_points_npy("OptimizedTrajectory/2025-02-28_01-26-52/bestpoints.npy")
+    custom_points = create_random_custom_points(num_points, max_world_size)
 
     # Start simulation
     print("Simulating trajectory...")
-    sim = Simulation(drone, world, angle_noise_model)
-    execute_simulation(
-        sim, world, A, B, custom_points, get_cost_gains(A, B, drone),
-        showplots=True, interval=30, log_folder="OptimizedTrajectory/2025-02-28_01-26-52",
-        dt=0.1, print_info=True, save_log=True, print_log=False
+    sim = Simulation([drone], world, angle_noise_model)
+    trajectory, total_cost, log_data, all_targets, simulation_completed = execute_simulation(
+        sim, world, [A], [B], [custom_points], [get_cost_gains(A, B, drone)],
+        showplots=True, showanimation=True, interval=30, log_folder="Logs",
+        dt=0.1, print_info=True, save_log=False,
+        collision_distance=params.get("collision_distance", 2.0),
+        collision_cost=params.get("collision_cost", 1e6)
     )
 

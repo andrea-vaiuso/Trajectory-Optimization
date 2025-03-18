@@ -9,7 +9,7 @@ from optuna.samplers import TPESampler
 from Entity.Simulation import Simulation
 from Entity.World import World
 from Entity.Drone import Drone
-from utility import showPlot, plotCosts, show2DWorld
+from utility import show3DAnimation, plotCosts, show2DWorld
 
 # Global optimization counters
 iterations = 0
@@ -82,7 +82,7 @@ def execute_simulation(drone: Drone, world: World, noise_model, A, B, custom_poi
     )
     if showplots:
         show2DWorld(world, world.grid_size, trajectory, A, B, all_targets, save=True, save_folder=log_folder)    
-        showPlot(trajectory, A, B, all_targets, world, world.grid_size, world.max_world_size, log_data, interval=interval)
+        show3DAnimation(trajectory, A, B, all_targets, world, world.grid_size, world.max_world_size, log_data, interval=interval)
 
 
 def main():

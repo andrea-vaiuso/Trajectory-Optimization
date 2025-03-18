@@ -54,7 +54,7 @@ def show2DWorld(world: World, grid_size, trajectories=None, A_list=None, B_list=
     plt.show()
 
 
-def showPlot(trajectories, A_list, B_list, all_targets, world: World, grid_size, max_world_size, log_data, interval=50):
+def show3DAnimation(trajectories, A_list, B_list, all_targets, world: World, grid_size, max_world_size, log_data, interval=50):
     colors = ['green', 'blue', 'magenta', 'orange', 'cyan']
     fig = plt.figure(figsize=(10,8))
     ax = fig.add_subplot(111, projection='3d')

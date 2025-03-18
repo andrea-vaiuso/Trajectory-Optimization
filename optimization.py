@@ -11,7 +11,7 @@ from Entity.World import World
 from Entity.Drone import Drone
 from matplotlib import pyplot as plt
 import matplotlib.animation as animation
-from utility import showPlot, plotCosts, show2DWorld
+from utility import show3DAnimation, plotCosts, show2DWorld
 
 # Global optimization counters and history
 iterations = 0
@@ -105,7 +105,7 @@ def build_dimensions(A, B, num_points, grid_step, max_world_size, perturbation_f
 
 def execute_simulation(sim: Simulation, world: World, 
                        A_list, B_list, custom_points_list, cost_gains_list, 
-                       showplots=True, interval=10, log_folder="Logs",
+                       showplots=False, showanimation=False, interval=10, log_folder="Logs",
                        dt=0.1, print_info=False, save_log=True, print_log=False,
                        collision_distance=2.0, collision_cost=1e6):
     trajectories, total_cost, log_data, all_targets, simulation_completed = sim.simulate_trajectory(
@@ -119,8 +119,9 @@ def execute_simulation(sim: Simulation, world: World,
     )
     if showplots:
         show2DWorld(world, world.grid_size, trajectories, A_list, B_list, all_targets,
-                    save=True, save_folder=log_folder)    
-        showPlot(trajectories, A_list, B_list, all_targets, world, world.grid_size, world.max_world_size, log_data, interval=interval)
+                    save=True, save_folder=log_folder)
+    if showanimation:
+        show3DAnimation(trajectories, A_list, B_list, all_targets, world, world.grid_size, world.max_world_size, log_data, interval=interval)
     return trajectories, total_cost, log_data, all_targets, simulation_completed
 
 def animate_optimization_steps(world: World, grid_size, A_list, B_list, optimization_history, save_path):
@@ -251,7 +252,7 @@ def optimize(params, world, drones):
 
         trajectory, total_cost, log_data, all_targets, simulation_completed = execute_simulation(
             sim, world, A_list, B_list, custom_points_list, cost_gains_list,
-            showplots=False, interval=30, log_folder="Logs",
+            showplots=False, showanimation=False, interval=30, log_folder="Logs",
             dt=1, print_info=True, save_log=False,
             collision_distance=params.get("collision_distance", 2.0),
             collision_cost=params.get("collision_cost", 1e6)
@@ -291,7 +292,6 @@ def optimize(params, world, drones):
     save_folder = f"OptimizedTrajectory/{time_str}"
     os.makedirs(save_folder, exist_ok=True)
     np.save(f"{save_folder}/bestpoints.npy", best_custom_points_list)
-    plotCosts(costs[1:], save=True, datetime=time_str)
 
     optimization_info = {
         "n_iterations": int(n_iterations),
@@ -320,7 +320,7 @@ def optimize(params, world, drones):
     with open(f"{save_folder}/optimization_info.json", "w") as json_file:
         json.dump(optimization_info, json_file, indent=4)
     
-    create_opt_ani = False
+    create_opt_ani = True
     if create_opt_ani:
         anim_path = f"{save_folder}/optimization_animation.gif"
         if optimization_history:
@@ -329,6 +329,8 @@ def optimize(params, world, drones):
             print(f"Animation saved as {anim_path}")
         else:
             print("No completed simulation steps were recorded for animation.")
+        
+    plotCosts(costs[1:], save=True, datetime=time_str)
     
     return sim, world, A_list, B_list, best_custom_points_list, cost_gains_list, save_folder
 

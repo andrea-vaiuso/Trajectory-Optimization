@@ -1,14 +1,14 @@
 # Description: Optimization parameters for the drone trajectory optimization
 
 # Optimization Parameters
-n_iterations: 80 # Number of optimization iterations
-optimization_random_state: 42 # Random state for optimization
+n_iterations: 1250 # Number of optimization iterations
+optimization_random_state: 44 # Random state for optimization
 
 # World Parameters
 grid_size: 10 # Grid size (in meters) This determines the areas where the noise effect is calculated
 max_world_size: 1000 # Maximum world size (in meters)
-grid_step: 7 # Grid discretization step (in meters) for searching coordinates during optimization
-world_file_name: world_winterthur.pkl # World file name
+grid_step: 5 # Grid discretization step (in meters) for searching coordinates during optimization
+world_file_name: Worlds/world_winterthur.pkl # World file name
 
 # Drone Parameters
 drone_model_name: "DJI Matrice 300 RTK" # Drone model name

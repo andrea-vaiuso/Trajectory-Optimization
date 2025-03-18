@@ -42,7 +42,7 @@ def main():
     print("Executing simulation...")
     execute_simulation(
         sim, world, A, B, custom_points_best, cost_gains,
-        showplots=True, interval=30, log_folder=save_folder,
+        showplots=True, showanimation=True, interval=30, log_folder=save_folder,
         dt=0.1, print_info=True, save_log=True, print_log=False
     )
 

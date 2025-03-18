@@ -36,7 +36,7 @@ class Simulation:
                             noise_annoyance_radius=100,
                             cost_gains_list=None,
                             time_limit_gain=10,
-                            collision_distance=2.0,
+                            collision_distance=15.0,
                             collision_cost=9e4,
                             save_log=True,
                             save_log_folder="Logs",

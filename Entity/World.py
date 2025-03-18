@@ -33,6 +33,15 @@ class World:
             "noise_penalty": 0,
             "color": "green",
             "alpha": 0.1
+        },
+        4: {
+            "id": 4,
+            "name": "Forbidden Area",
+            "min_altitude": 0, 
+            "max_altitude": 0, 
+            "noise_penalty": 10,
+            "color": "red",
+            "alpha": 0.1
         }
     }
     

@@ -3,7 +3,7 @@ from Entity.World import World
 from Entity.Drone import Drone
 import numpy as np
 from skopt import gp_minimize
-from utility import showPlot
+from utility import show3DAnimation
 import time
 
 iterations = 0
@@ -194,7 +194,7 @@ def main():
         power_cost_gain=power_gain
     )
 
-    showPlot(trajectory, A, B, all_targets, world, grid_size, max_world_size, log_data)
+    show3DAnimation(trajectory, A, B, all_targets, world, grid_size, max_world_size, log_data)
 
 if __name__ == "__main__":
     main()
