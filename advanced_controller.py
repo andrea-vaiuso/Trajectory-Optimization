@@ -28,21 +28,21 @@ def euler_to_rot(phi, theta, psi):
 
 class Controller:
     def __init__(self, kp, ki, kd):
-        """Inizializza i parametri del PID"""
+        """Initialize PID parameters."""
         self.kp = kp
         self.ki = ki
         self.kd = kd
-        self.integral = 0
-        self.prev_error = 0
-    
+        self.integral = 0.0
+        self.prev_error = 0.0
+
     def update(self, current_value, target_value, dt):
-        """Calcola l'uscita PID basata sull'errore corrente"""
+        """Compute the PID output using RK4 to integrate the error."""
         error = target_value - current_value
         self.integral += error * dt
         derivative = (error - self.prev_error) / dt if dt > 0 else 0
         self.prev_error = error
-
         return self.kp * error + self.ki * self.integral + self.kd * derivative
+
 
 
 class QuadCopterController:
@@ -50,8 +50,14 @@ class QuadCopterController:
                  kp_pos, ki_pos, kd_pos,
                  kp_alt, ki_alt, kd_alt,  # PID per posizione (x, y, z)
                  kp_att, ki_att, kd_att,  # PID per assetto (roll, pitch, yaw)
-                 m, g, b, dt=0.01):
+                 m, g, b,
+                 u1_limit=100.0, u2_limit=10.0, u3_limit=10.0, u4_limit=10.0):
         
+        self.u1_limit = u1_limit
+        self.u2_limit = u2_limit
+        self.u3_limit = u3_limit
+        self.u4_limit = u4_limit
+
         # PID per la posizione (x, y, z)
         self.pid_x = Controller(kp_pos, ki_pos, kd_pos)
         self.pid_y = Controller(kp_pos, ki_pos, kd_pos)
@@ -63,7 +69,6 @@ class QuadCopterController:
         self.pid_psi   = Controller(kp_att, ki_att, kd_att)  # yaw desiderato (verrà impostato dinamicamente)
         
         # Info di stato e tempo
-        self.dt = dt
         self.state = state
 
         # Per il feed-forward su z
@@ -82,13 +87,13 @@ class QuadCopterController:
         x,  y,  z  = state['pos']
         phi, theta, psi = state['angles']
         x_t, y_t, z_t = target['x'], target['y'], target['z']
-
         
 
         # Outer loop: posizione
         # Feed-forward di hover: m*g
         # + PID (che "raffina" intorno a mg in base all'errore su z)
-        hover_thrust = self.m * self.g
+        compensation = np.clip(1.0 / (np.cos(theta) * np.cos(phi)), 1.0, 1.5)
+        hover_thrust = self.m * self.g * compensation
         pid_z_output = self.pid_z.update(z, z_t, dt)
         u1 = hover_thrust + pid_z_output  # TOT thrust
 
@@ -105,6 +110,12 @@ class QuadCopterController:
         u2 = self.pid_phi.update(phi, phi_des, dt)
         u3 = self.pid_theta.update(theta, theta_des, dt)
         u4 = self.pid_psi.update(psi, psi_des, dt)
+
+        # Saturazione dei comandi
+        u1 = np.clip(u1, 0, self.u1_limit)
+        u2 = np.clip(u2, -self.u2_limit, self.u2_limit)
+        u3 = np.clip(u3, -self.u3_limit, self.u3_limit)
+        u4 = np.clip(u4, -self.u4_limit, self.u4_limit)
         
         return (u1, u2, u3, u4)
 
@@ -227,53 +238,77 @@ class QuadcopterModel:
 
         return rpm1, rpm2, rpm3, rpm4
 
+    def _rk4_step(self, state, dt):
+        # Funzione ausiliaria che ritorna le derivate (d/dt) dello stato
+        def f(s):
+            return {
+                'pos': s['vel'],
+                'vel': self._translational_dynamics(s),
+                'angles': s['ang_vel'],
+                'ang_vel': self._rotational_dynamics(s)
+            }
+        
+        # Calcolo k1
+        k1 = f(state)
+        
+        # Calcolo k2: stato a metà passo
+        state1 = {key: state[key] + k1[key]*(dt/2) for key in ['pos', 'vel', 'angles', 'ang_vel']}
+        state1['rpm'] = state['rpm']  # rpm rimangono costanti durante l'integrazione
+        k2 = f(state1)
+        
+        # Calcolo k3: altro stato a metà passo usando k2
+        state2 = {key: state[key] + k2[key]*(dt/2) for key in ['pos', 'vel', 'angles', 'ang_vel']}
+        state2['rpm'] = state['rpm']
+        k3 = f(state2)
+        
+        # Calcolo k4: stato al passo completo usando k3
+        state3 = {key: state[key] + k3[key]*dt for key in ['pos', 'vel', 'angles', 'ang_vel']}
+        state3['rpm'] = state['rpm']
+        k4 = f(state3)
+        
+        # Combina i k per ottenere il nuovo stato
+        new_state = {}
+        for key in ['pos', 'vel', 'angles', 'ang_vel']:
+            new_state[key] = state[key] + (dt/6) * (k1[key] + 2*k2[key] + 2*k3[key] + k4[key])
+        new_state['rpm'] = state['rpm']
+        
+        return new_state
+
     def update_state(self, state, target, dt):
-        # 1) Get control commands from the controller
+        # 1) Ottieni i comandi di controllo dal controllore
         u1, u2, u3, u4 = self.controller.update(state, target, dt)
         rpm1, rpm2, rpm3, rpm4 = self._command_to_rpm(u1, u2, u3, u4)
-        # print(f"RPMs: {state['rpm']}, U: (u1={u1:.2f}, u2={u2:.2f}, u3={u3:.2f}, u4={u4:.2f})")
-
-        # 2) Update the state with new RPMs before calculating accelerations
         state["rpm"] = np.array([rpm1, rpm2, rpm3, rpm4])
-
-        # 3) Compute accelerations with the updated motor speeds
-        acc = self._translational_dynamics(state)
-        ang_acc = self._rotational_dynamics(state)
-
-        # 4) Integrate the state using Euler integration
-        state['pos']     += state['vel'] * dt
-        state['vel']     += acc * dt
-        state['angles']  += state['ang_vel'] * dt
-        state['ang_vel'] += ang_acc * dt
-
-        # 5) Normalize the angles to the range [-pi, pi]
+        
+        # 2) Integra lo stato usando il metodo RK4
+        state = self._rk4_step(state, dt)
+        
+        # 3) Normalizza gli angoli nell'intervallo [-pi, pi]
         state['angles'] = np.array([wrap_angle(a) for a in state['angles']])
-
+        
         return state
-
 
 
 
 if __name__ == "__main__":
     dt = 0.01
+    simulation_time = 200.0
+
+    # Flight target
+    target = {
+        'x': 10.0,
+        'y': 10.0,
+        'z': 100.0
+    }
 
     #kp_pos, ki_pos, kd_pos = 0.1, 0.0, 0.5
     #kp_alt, ki_alt, kd_alt = 0.05, 0.0, 0.7
     #kp_att, ki_att, kd_att = 0.01, 0.0, 0.05
 
-    kp_pos, ki_pos, kd_pos = 0.1018, 0.0000, 0.9007
-    kp_alt, ki_alt, kd_alt = 0.0587, 0.0000, 0.7341
-    kp_att, ki_att, kd_att = 0.0500, 0.0100, 0.0797
-
-    #kp_pos = 0.2000 
-    #ki_pos = 0.0000 
-    #kd_pos = 1.0000
-    #kp_alt = 0.0100
-    #ki_alt = 0.0000
-    #kd_alt = 1.0000
-    #kp_att = 0.0500
-    #ki_att = 0.0100
-    #kd_att = 0.0437
+    # reactivity, sability, overshoot
+    kp_pos, ki_pos, kd_pos = 0.1018, 1e-6, 1.2
+    kp_alt, ki_alt, kd_alt = 0.0587, 1e-6, 0.7341
+    kp_att, ki_att, kd_att = 0.0500, 1e-6, 0.0797
 
     params = {
         'm': 5.2,  # kg
@@ -296,12 +331,7 @@ if __name__ == "__main__":
         'rpm': np.array([0.0, 0.0, 0.0, 0.0])
     }
 
-    # Flight target
-    target = {
-        'x': 20.0,
-        'y': 20.0,
-        'z': 20.0
-    }
+    
 
     # Initialize controller and model
     quad_controller = QuadCopterController(
@@ -309,9 +339,15 @@ if __name__ == "__main__":
         kp_pos, ki_pos, kd_pos,    # Position PID
         kp_alt, ki_alt, kd_alt,    # Altitude PID
         kp_att, ki_att, kd_att,    # Attitude PID
-        m=params['m'], g=params['g'], b=params['b'], 
-        dt=dt
+        m=params['m'], g=params['g'], b=params['b'],
+        u1_limit=100.0, u2_limit=10.0, u3_limit=5.0, u4_limit=10.0
     )
+    """
+        - u1 ~ thrust
+        - u2 ~ controllo roll
+        - u3 ~ controllo pitch
+        - u4 ~ controllo yaw"
+    """
     
     drone = QuadcopterModel(
         m=params['m'],
@@ -327,88 +363,132 @@ if __name__ == "__main__":
         max_rpm=10000.0
     )
 
-    # Run simulation: 20 seconds
-    simulation_time = 100.0
+
+    
     num_steps = int(simulation_time / dt)
 
     positions = []
     angles_history = []
     rpms_history = []
     time_history = []
+    horiz_speed_history = []
+    vertical_speed_history = []
 
+    frame_skip = 6
     for step in range(num_steps):
         state = drone.update_state(state, target, dt)
-        positions.append(state['pos'].copy())
-        angles_history.append(state['angles'].copy())
-        rpms_history.append(state['rpm'].copy())
-        time_history.append(step * dt)
-        # print(f"Time: {step*dt:.2f}s, Pos: {state['pos']}, Ang: {state['angles']}")
-        # You can comment out time.sleep(dt) to run simulation faster
-        # time.sleep(dt)
+        if step % frame_skip == 0:
+            positions.append(state['pos'].copy())
+            angles_history.append(state['angles'].copy())
+            rpms_history.append(state['rpm'].copy())
+            time_history.append(step * dt)
+            horiz_speed_history.append(np.linalg.norm(state['vel'][:2]))
+            vertical_speed_history.append(state['vel'][2])
+            # print(f"Time: {step*dt:.2f}s, Pos: {state['pos']}, Ang: {state['angles']}")
+            # You can comment out time.sleep(dt) to run simulation faster
+            # time.sleep(dt)
 
     positions = np.array(positions)
     angles_history = np.array(angles_history)
     rpms_history = np.array(rpms_history)
+    time_history = np.array(time_history)
+    horiz_speed_history = np.array(horiz_speed_history)
+    vertical_speed_history = np.array(vertical_speed_history)
 
-    # ----- Animation code -----
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
     # Set fixed plot limits (0 to 50 for x, y, z)
-    ax.set_xlim(0, 50)
-    ax.set_ylim(0, 50)
-    ax.set_zlim(0, 50)
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 100)
+    ax.set_zlim(0, 100)
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     ax.set_title('Quadcopter Animation')
 
+    # Pre-create the trajectory line and drone scatter
+    trajectory_line, = ax.plot([], [], [], 'b--', lw=2, label='Trajectory')
+    drone_scatter = ax.scatter([], [], [], color='red', s=50, label='Drone')
+    # Pre-create text annotation for time and RPM
+    time_text = ax.text2D(0.05, 0.05, "", transform=ax.transAxes, fontsize=10,
+                            bbox=dict(facecolor='white', alpha=0.8))
+
+    # (Optional) For the body axes, you can choose to not display quivers to speed up rendering.
+    # If you do want quivers, a strategy is to remove and add them each frame.
+    current_quivers = []
+
+    # Helper function: Euler angles to rotation matrix (as defined in your code)
+    def euler_to_rot(phi, theta, psi):
+        Rz = np.array([[np.cos(psi), -np.sin(psi), 0],
+                    [np.sin(psi),  np.cos(psi), 0],
+                    [0, 0, 1]])
+        Ry = np.array([[ np.cos(theta), 0, np.sin(theta)],
+                    [0, 1, 0],
+                    [-np.sin(theta), 0, np.cos(theta)]])
+        Rx = np.array([[1, 0, 0],
+                    [0, np.cos(phi), -np.sin(phi)],
+                    [0, np.sin(phi),  np.cos(phi)]])
+        return Rz @ Ry @ Rx
+
+    def init():
+        trajectory_line.set_data([], [])
+        trajectory_line.set_3d_properties([])
+        drone_scatter._offsets3d = ([], [], [])
+        time_text.set_text("")
+        return trajectory_line, drone_scatter, time_text
+
     def update_frame(frame):
-        ax.cla()  # Clear axes
+        global current_quivers
+        # Update trajectory line without clearing axes
+        xdata = positions[:frame, 0]
+        ydata = positions[:frame, 1]
+        zdata = positions[:frame, 2]
+        trajectory_line.set_data(xdata, ydata)
+        trajectory_line.set_3d_properties(zdata)
         
-        # Set fixed limits again (after cla)
-        ax.set_xlim(0, 50)
-        ax.set_ylim(0, 50)
-        ax.set_zlim(0, 50)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        ax.set_title('Quadcopter Animation')
-        
-        # Plot trajectory so far
-        ax.plot(positions[:frame, 0], positions[:frame, 1], positions[:frame, 2], 'b--', label='Trajectory')
-        
-        # Drone position at current frame
+        # Update the drone scatter position
         pos = positions[frame]
-        ax.scatter(pos[0], pos[1], pos[2], color='red', s=50, label='Drone')
+        drone_scatter._offsets3d = ([pos[0]], [pos[1]], [pos[2]])
         
-        # Get current Euler angles and compute rotation matrix
+        # Remove previous quivers for body axes if any
+        for q in current_quivers:
+            q.remove()
+        current_quivers = []
+        
+        # Optionally, add quiver arrows for body axes
+        # Compute rotation matrix from Euler angles
         phi, theta, psi = angles_history[frame]
         R = euler_to_rot(phi, theta, psi)
-        
-        # Define body axes in drone's frame
+        arrow_len = 4
         x_body = R @ np.array([1, 0, 0])
         y_body = R @ np.array([0, 1, 0])
         z_body = R @ np.array([0, 0, 1])
-        arrow_len = 4  # Larger arrow length
         
-        # Plot arrows using quiver
-        ax.quiver(pos[0], pos[1], pos[2], arrow_len*x_body[0], arrow_len*x_body[1], arrow_len*x_body[2], color='r')
-        ax.quiver(pos[0], pos[1], pos[2], arrow_len*y_body[0], arrow_len*y_body[1], arrow_len*y_body[2], color='g')
-        ax.quiver(pos[0], pos[1], pos[2], arrow_len*z_body[0], arrow_len*z_body[1], arrow_len*z_body[2], color='b')
+        qx = ax.quiver(pos[0], pos[1], pos[2], arrow_len*x_body[0], arrow_len*x_body[1], arrow_len*x_body[2], color='r')
+        qy = ax.quiver(pos[0], pos[1], pos[2], arrow_len*y_body[0], arrow_len*y_body[1], arrow_len*y_body[2], color='g')
+        qz = ax.quiver(pos[0], pos[1], pos[2], arrow_len*z_body[0], arrow_len*z_body[1], arrow_len*z_body[2], color='b')
+        current_quivers.extend([qx, qy, qz])
         
-        # Add text in bottom left: simulation time and current RPM
-        current_time = frame * dt
+        # Update text annotation with current time and RPM
+        current_time = frame * dt * frame_skip
         current_rpm = rpms_history[frame]
-        text_str = f"Time: {current_time:.2f} s\nRPM: [{current_rpm[0]:.2f}, {current_rpm[1]:.2f}, {current_rpm[2]:.2f}, {current_rpm[3]:.2f}]"
-        ax.text2D(0.05, 0.05, text_str, transform=ax.transAxes, fontsize=10, bbox=dict(facecolor='white', alpha=0.8))
+        text_str = f"Time: {current_time:.2f} s\n " +\
+            f"RPM: [{current_rpm[0]:.2f}, {current_rpm[1]:.2f}, {current_rpm[2]:.2f}, {current_rpm[3]:.2f}] "+\
+            f"\nVertical Speed: {vertical_speed_history[frame]:.2f} m/s\nHoriz Speed: {horiz_speed_history[frame]:.2f} m/s"+\
+            f"\nPitch: {angles_history[frame][0]:.2f} rad\nRoll: {angles_history[frame][1]:.2f} rad\nYaw: {angles_history[frame][2]:.2f} rad"
+        time_text.set_text(text_str)
         
-    # Increase animation speed by reducing the interval (e.g., from 20ms to 10ms)
-    ani = animation.FuncAnimation(fig, update_frame, frames=len(positions), interval=1, repeat=True)
+        return trajectory_line, drone_scatter, time_text, *current_quivers
+
+    # Create animation. Using a short interval; note that full-screen mode and 3D rendering
+    # in Matplotlib are inherently heavy, so performance is still limited.
+    ani = animation.FuncAnimation(fig, update_frame, frames=len(positions),
+                                init_func=init, interval=50, blit=False, repeat=True)
     plt.show()
 
         # ----- Post-Simulation: Plot x, y, z vs Time with Target Lines -----
-    fig2, axs = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
+    fig2, axs = plt.subplots(5, 1, figsize=(8, 10), sharex=True)
     axs[0].plot(time_history, positions[:, 0], label='x position')
     axs[0].axhline(target['x'], color='r', linestyle='--', label='Target x')
     axs[0].set_ylabel('X (m)')
@@ -422,5 +502,13 @@ if __name__ == "__main__":
     axs[2].set_ylabel('Z (m)')
     axs[2].set_xlabel('Time (s)')
     axs[2].legend()
+    axs[3].plot(time_history, horiz_speed_history, label='speed')
+    axs[3].set_ylabel('Horiz Speed (m/s)')
+    axs[3].set_xlabel('Time (s)')
+    axs[3].legend()
+    axs[4].plot(time_history, vertical_speed_history, label='speed')
+    axs[4].set_ylabel('Vertical Speed (m/s)')
+    axs[4].set_xlabel('Time (s)')
+    axs[4].legend()
     fig2.suptitle('Drone Position vs Time')
     plt.show()

@@ -92,7 +92,7 @@ class Simulation:
                 vertical_err = abs(pos_arr[2] - target_pos[2])
                 if horizontal_err > horizontal_threshold or vertical_err > vertical_threshold:
                     prev_pos = pos_arr.copy()
-                    # Update control (assumes each Drone has update_control method).
+                    # Update control.
                     pitch, yaw, rpms, new_pos, vel = self.drones[i].update_control(current_target, dt)
                     self.drones[i].position = new_pos.copy()
                     trajectories[i].append(new_pos.copy())
