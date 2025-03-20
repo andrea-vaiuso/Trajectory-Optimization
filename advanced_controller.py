@@ -211,7 +211,7 @@ class QuadcopterModel:
         T_hover = self.m * self.g
         w_hover = np.sqrt(T_hover / (4 * self.b))
         rpm_hover = w_hover * 60.0 / (2.0 * np.pi)
-        print(f"[INFO] Hover thrust needed = {T_hover:.2f} N, hover rpm per motor ~ {rpm_hover:.1f} rpm")
+        #print(f"[INFO] Hover thrust needed = {T_hover:.2f} N, hover rpm per motor ~ {rpm_hover:.1f} rpm")
 
     def __str__(self) -> str:
         """
@@ -414,19 +414,32 @@ def main():
     # Define multiple targets; for example, first target: (100, 100, 40), second: (50, 85, 60),
     # third: (80, 20, 10), and fourth: (0, 0, 0).
     targets = [
-        {'x': 100.0, 'y': 100.0, 'z': 40.0},
-        {'x': 50.0, 'y': 85.0, 'z': 60.0},
-        {'x': 80.0, 'y': 20.0, 'z': 10.0},
-        {'x': 0.0, 'y': 0.0, 'z': 0.0}
+        {'x': 10.0, 'y': 10.0, 'z': 70.0},  # Start near origin but at high altitude (rapid ascent required)
+        {'x': 90.0, 'y': 10.0, 'z': 70.0},  # Far x, near y, maintaining high altitude (long horizontal flight)
+        {'x': 90.0, 'y': 90.0, 'z': 90.0},  # Far in both x and y with an even higher altitude (climb and diagonal flight)
+        {'x': 10.0, 'y': 90.0, 'z': 20.0},  # Sharp maneuver: near x, far y, with a dramatic altitude drop
+        {'x': 50.0, 'y': 50.0, 'z': 40.0},  # Central target with intermediate altitude (transition maneuver)
+        {'x': 60.0, 'y': 60.0, 'z': 40.0},  # Hovering target 1
+        {'x': 70.0, 'y': 70.0, 'z': 40.0},  # Gradual move to hovering target 2
+        {'x': 80.0, 'y': 80.0, 'z': 40.0},  # Gradual move to hovering target 3
+        {'x': 10.0, 'y': 10.0, 'z': 10.0}   # Final target: near origin at low altitude (drone must come to a near stop)
     ]
     current_target_idx: int = 0
     target = targets[current_target_idx]
 
-    # PID gains for various controllers
-    kp_pos, ki_pos, kd_pos = 0.1, 1e-6, 0.5
-    kp_alt, ki_alt, kd_alt = 0.2, 1e-5, 1.3
-    kp_att, ki_att, kd_att = 0.05, 1e-6, 0.05
+    # PID for position, altitude, attitude, and yaw
+    # kp_pos, ki_pos, kd_pos = 0.1, 1e-6, 0.5
+    # kp_alt, ki_alt, kd_alt = 2, 1e-5, 8
+    # kp_att, ki_att, kd_att = 0.05, 1e-6, 0.05
     kp_yaw, ki_yaw, kd_yaw = 0.5, 1e-6, 0.1
+
+    #kp_pos, ki_pos, kd_pos, kp_alt, ki_alt, kd_alt, \
+    # kp_att, ki_att, kd_att = 4.95, 0.000317, 7.74, 5.05, 6.27e-05, 9.313767570557587, 7.0, 0.00087, 1.248373550950162
+
+    kp_pos, ki_pos, kd_pos, kp_alt, ki_alt, kd_alt, \
+    kp_att, ki_att, kd_att = 0.05, 1e-07, 0.1, \
+        5.0, 0.0006127590885483034, 8.592641351266916, \
+    1.9490155153777726, 0.000463991370766884, 0.42446961785318355, \
 
     # Drone physical parameters
     params = {
@@ -491,7 +504,7 @@ def main():
 
         # Check if the drone has reached the current target within a 3 m error threshold
         pos_error = np.linalg.norm(state['pos'] - np.array([target['x'], target['y'], target['z']]))
-        if pos_error < 3.0:
+        if pos_error < 0.5:
             target_reach_times.append(current_time)
             if current_target_idx < len(targets) - 1:
                 current_target_idx += 1
@@ -669,8 +682,12 @@ def main():
     axs[1, 1].legend()
     
     # Speeds Plot (Horizontal & Vertical)
-    axs[2, 1].plot(time_history, horiz_speed_history, label='Horizontal Speed')
-    axs[2, 1].plot(time_history, vertical_speed_history, label='Vertical Speed')
+    axs[2, 1].plot(time_history, horiz_speed_history, label='Horizontal Speed', color='r')
+    axs[2, 1].plot(time_history, vertical_speed_history, label='Vertical Speed', color='g')
+    axs[2, 1].hlines(np.mean(horiz_speed_history), time_history[0], time_history[-1],
+                    label=f'Avg Horiz Speed: {np.mean(horiz_speed_history):.2f} m/s', colors='r', linestyles='--')
+    axs[2, 1].hlines(np.mean(vertical_speed_history), time_history[0], time_history[-1],
+                    label=f'Avg Vert Speed: {np.mean(abs(vertical_speed_history)):.2f} m/s', colors='g', linestyles='--')
     axs[2, 1].set_title('Speeds')
     axs[2, 1].set_ylabel('Speed (m/s)')
     axs[2, 1].set_xlabel('Time (s)')
