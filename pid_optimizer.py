@@ -1,62 +1,61 @@
-"""
-bayes_optimizer.py
-
-This file implements a Bayesian optimizer for tuning the controller gains defined in advanced_controller.py.
-The objective is to reduce the time to reach the final target while also minimizing the final distance error
-and reducing oscillations in the pitch and roll values.
-"""
-
 import numpy as np
-from skopt import gp_minimize
-from advanced_controller import QuadCopterController, QuadcopterModel
-import matplotlib.pyplot as plt
+from bayes_opt import BayesianOptimization
 
 iteration = 0
-n_calls = 500
+n_iter = 500
 costs = []
 
-def simulate_gains(gains: list) -> float:
-    """
-    Run the quadcopter simulation with the specified gains and return a cost.
-    The cost is defined as:
-         cost = (time to reach final target)
-              + penalty_weight_distance * (final distance error)
-              + osc_weight * (pitch oscillation + roll oscillation)
-    
-    Parameters:
-        gains (list of float): List of 12 gain parameters in the following order:
-            [kp_pos, ki_pos, kd_pos, kp_alt, ki_alt, kd_alt,
-             kp_att, ki_att, kd_att, kp_yaw, ki_yaw, kd_yaw].
-    
-    Returns:
-        float: The overall cost.
-               If the final target is not reached within the maximum simulation time,
-               the cost reflects both the maximum time and the remaining distance error.
-    """
-    global iteration, costs
-    iteration += 1
+# Import the necessary classes and functions from advanced_controller.py
+from advanced_controller import (
+    QuadCopterController,
+    QuadcopterModel,
+    compute_moving_target,
+    wrap_angle
+)
 
-    # Simulation parameters (same as advanced_controller)
+def simulate_pid(kp_pos, ki_pos, kd_pos,
+                 kp_alt, ki_alt, kd_alt,
+                 kp_att, ki_att, kd_att):
+    """
+    Runs the simulation with the provided PID gains and returns the cost.
+    The cost is computed as:
+       cost = final_time + (final_distance ** 0.9) + osc_weight*(pitch_osc + roll_osc)
+    where:
+       - final_time is the simulation time when the drone reached the final target (or the max simulation time)
+       - final_distance is the remaining distance to the final target
+       - pitch_osc and roll_osc are the sums of absolute differences of pitch and roll over time.
+    """
+    # Simulation parameters
     dt = 0.007
-    simulation_time = 300.0
+    simulation_time = 200.0
     num_steps = int(simulation_time / dt)
-
-    # Define the same targets as in advanced_controller
-    targets = [
-        {'x': 10.0, 'y': 10.0, 'z': 70.0},  # Start near origin but at high altitude (rapid ascent required)
-        {'x': 90.0, 'y': 10.0, 'z': 70.0},  # Far x, near y, maintaining high altitude (long horizontal flight)
-        {'x': 90.0, 'y': 90.0, 'z': 90.0},  # Far in both x and y with an even higher altitude (climb and diagonal flight)
-        {'x': 10.0, 'y': 90.0, 'z': 20.0},  # Sharp maneuver: near x, far y, with a dramatic altitude drop
-        {'x': 50.0, 'y': 50.0, 'z': 40.0},  # Central target with intermediate altitude (transition maneuver)
-        {'x': 60.0, 'y': 60.0, 'z': 40.0},  # Hovering target 1
-        {'x': 70.0, 'y': 70.0, 'z': 40.0},  # Gradual move to hovering target 2
-        {'x': 80.0, 'y': 80.0, 'z': 40.0},  # Gradual move to hovering target 3
-        {'x': 10.0, 'y': 10.0, 'z': 10.0}   # Final target: near origin at low altitude (drone must come to a near stop)
+    
+    # Define waypoints (with desired speeds)
+    waypoints = [
+        {'x': 10.0, 'y': 10.0, 'z': 70.0, 'v':10},  # Start near origin but at high altitude (rapid ascent required)
+        {'x': 90.0, 'y': 10.0, 'z': 70.0, 'v':10},  # Far x, near y, maintaining high altitude (long horizontal flight)
+        {'x': 90.0, 'y': 90.0, 'z': 90.0, 'v':10},   # Far in both x and y with an even higher altitude (climb and diagonal flight)
+        {'x': 10.0, 'y': 90.0, 'z': 20.0, 'v':10},   # Sharp maneuver: near x, far y, with a dramatic altitude drop
+        {'x': 50.0, 'y': 50.0, 'z': 40.0, 'v':10},  # Central target with intermediate altitude (transition maneuver)
+        {'x': 60.0, 'y': 60.0, 'z': 40.0, 'v':10},  # Hovering target 1
+        {'x': 70.0, 'y': 70.0, 'z': 40.0, 'v':10},  # Gradual move to hovering target 2
+        {'x': 80.0, 'y': 80.0, 'z': 40.0, 'v':10},  # Gradual move to hovering target 3
+        {'x': 10.0, 'y': 10.0, 'z': 10.0, 'v':10}   # Final target: near origin at low altitude (drone must come to a near stop)
     ]
-    current_target_idx = 0
-    target = targets[current_target_idx]
+    
+    # Initial drone state
+    state = {
+        'pos': np.array([0.0, 0.0, 0.0]),
+        'vel': np.array([0.0, 0.0, 0.0]),
+        'angles': np.array([0.0, 0.0, 0.0]),
+        'ang_vel': np.array([0.0, 0.0, 0.0]),
+        'rpm': np.array([0.0, 0.0, 0.0, 0.0])
+    }
+    
+    # PID gains for yaw remain fixed
+    kp_yaw, ki_yaw, kd_yaw = 0.5, 1e-6, 0.1
 
-    # Drone physical parameters (same as advanced_controller)
+    # Drone physical parameters
     params = {
         'm': 5.2,
         'g': 9.81,
@@ -68,33 +67,19 @@ def simulate_gains(gains: list) -> float:
         'Ca': np.array([0.1, 0.1, 0.15]),
         'Jr': 6e-5
     }
-
-    # Initial state of the drone
-    state = {
-        'pos': np.array([0.0, 0.0, 0.0]),
-        'vel': np.array([0.0, 0.0, 0.0]),
-        'angles': np.array([0.0, 0.0, 0.0]),
-        'ang_vel': np.array([0.0, 0.0, 0.0]),
-        'rpm': np.array([0.0, 0.0, 0.0, 0.0])
-    }
-
-    # Initialize lists for recording pitch and roll values over time.
-    angles_history = []
-
-    # Unpack the gains (12 parameters)
-    kp_pos, ki_pos, kd_pos, kp_alt, ki_alt, kd_alt, \
-    kp_att, ki_att, kd_att = gains
-
-    # Initialize the controller and drone model with the given gains
+    
+    # Create the QuadCopterController with the optimization parameters
     quad_controller = QuadCopterController(
         state, 
-        kp_pos, ki_pos, kd_pos,     
-        kp_alt, ki_alt, kd_alt,     
-        kp_att, ki_att, kd_att,
-        kp_att, ki_att, kd_att,   
+        kp_pos, ki_pos, kd_pos,     # PID for position
+        kp_alt, ki_alt, kd_alt,     # PID for altitude
+        kp_att, ki_att, kd_att,     # PID for attitude (roll and pitch)
+        kp_yaw, ki_yaw, kd_yaw,     # PID for yaw (fixed)
         m=params['m'], g=params['g'], b=params['b'],
         u1_limit=100.0, u2_limit=10.0, u3_limit=5.0, u4_limit=10.0
     )
+    
+    # Create the drone model
     drone = QuadcopterModel(
         m=params['m'],
         I=params['I'],
@@ -108,84 +93,127 @@ def simulate_gains(gains: list) -> float:
         controller=quad_controller,
         max_rpm=10000.0
     )
-
-    final_time = simulation_time
-    # Run simulation loop
+    
+    # Dynamic target initialization
+    current_seg_idx = 0
+    seg_start = state['pos'].copy()
+    seg_end = np.array([waypoints[current_seg_idx]['x'],
+                        waypoints[current_seg_idx]['y'],
+                        waypoints[current_seg_idx]['z']])
+    v_des = waypoints[current_seg_idx]['v']
+    k_lookahead = 1.0
+    
+    # Data logs for computing cost
+    positions = []
+    angles_history = []
+    time_history = []
+    
+    final_time = simulation_time  # default final time if never reached final target
+    threshold = 2.0  # distance threshold to consider final target reached
+    
     for step in range(num_steps):
-        state = drone.update_state(state, target, dt)
-        angles_history.append(state['angles'].copy())
-        current_time = step * dt
-        pos_error = np.linalg.norm(state['pos'] - np.array([target['x'], target['y'], target['z']]))
-        if pos_error < 3.0:
-            current_target_idx += 1
-            if current_target_idx >= len(targets):
-                final_time = current_time
-                break
+        # Compute dynamic target along current segment
+        target_dynamic, progress = compute_moving_target(state['pos'], seg_start, seg_end, v_des, k=k_lookahead)
+        # If progress on the segment exceeds a threshold, move to the next segment
+        if progress >= 0.8:
+            current_seg_idx += 1
+            if current_seg_idx < len(waypoints):
+                seg_start = seg_end
+                seg_end = np.array([waypoints[current_seg_idx]['x'],
+                                    waypoints[current_seg_idx]['y'],
+                                    waypoints[current_seg_idx]['z']])
+                v_des = waypoints[current_seg_idx]['v']
+                target_dynamic, progress = compute_moving_target(state['pos'], seg_start, seg_end, v_des, k=k_lookahead)
             else:
-                target = targets[current_target_idx]
+                target_dynamic = seg_end  # Final target
+        
+        # Update the drone state based on the dynamic target
+        state = drone.update_state(state, 
+                                   {'x': target_dynamic[0],
+                                    'y': target_dynamic[1],
+                                    'z': target_dynamic[2]},
+                                   dt)
+        current_time = step * dt
+        
+        positions.append(state['pos'].copy())
+        angles_history.append(state['angles'].copy())
+        time_history.append(current_time)
 
-    # Compute final distance error from the final target
-    final_target = targets[-1]
-    final_distance = np.linalg.norm(state['pos'] - np.array([final_target['x'], final_target['y'], final_target['z']]))
+        final_target = np.array([waypoints[-1]['x'], waypoints[-1]['y'], waypoints[-1]['z']])
+        if np.linalg.norm(state['pos'] - final_target) < threshold:
+            final_time = current_time
+            break
+        
 
-    # Compute oscillation penalty for pitch and roll.
-    # Convert angles_history to numpy array for easier diff computation.
+    positions = np.array(positions)
     angles_history = np.array(angles_history)
+    
+    # Compute cost
+    final_target = {'x': waypoints[-1]['x'], 'y': waypoints[-1]['y'], 'z': waypoints[-1]['z']}
+    final_distance = np.linalg.norm(state['pos'] - np.array([final_target['x'],
+                                                              final_target['y'],
+                                                              final_target['z']]))
+    # Compute oscillation penalty for pitch and roll
     pitch_osc = np.sum(np.abs(np.diff(angles_history[:, 0])))
     roll_osc  = np.sum(np.abs(np.diff(angles_history[:, 1])))
-    
-    # Define penalty weights for distance error and oscillations
     osc_weight = 3.0
 
     cost = final_time + (final_distance ** 0.9) + osc_weight * (pitch_osc + roll_osc)
-    costs.append(cost)
-    print(f"{iteration}/{n_calls} - SimTime: {final_time:.2f} s, "
-          f"DistFinalTarget: {final_distance:.2f} m, "
-          f"Osc: {pitch_osc+pitch_osc:.2f}, Cost: {cost:.2f}, Best: {min(costs):.2f} it({int(costs.index(min(costs)))+1})")
-    return cost
+    
+    return cost, final_time
 
-def objective(gains: list) -> float:
+def objective(kp_pos, ki_pos, kd_pos,
+              kp_alt, ki_alt, kd_alt,
+              kp_att, ki_att, kd_att):
     """
-    Objective function for Bayesian optimization. Runs the simulation with the provided gains
-    and returns the overall cost that combines time to reach the final target, the final distance error,
-    and oscillations in pitch and roll (the lower, the better).
-
-    Parameters:
-        gains (list of float): List of 12 controller gain parameters.
-
-    Returns:
-        float: Overall cost.
+    The objective function for Bayesian optimization.
+    Since we want to minimize the cost, we return its negative (BayesianOptimization maximizes).
     """
-    return simulate_gains(gains)
+    global iteration
+    iteration += 1
+    cost, final_time = simulate_pid(kp_pos, ki_pos, kd_pos,
+                        kp_alt, ki_alt, kd_alt,
+                        kp_att, ki_att, kd_att)
+    costs.append(-cost)
+    print(f"{iteration}/{n_iter}: cost={-cost}, best: {-max(costs)}, final_time={final_time}")
+    return -cost
+
+def main():
+    # Define the bounds for the optimization variables
+    pbounds = {
+        'kp_pos': (0.005, 0.5),   # around 0.05
+        'ki_pos': (1e-8, 1e-6),   # around 1e-7
+        'kd_pos': (0.01, 1.0),    # around 0.1
+        'kp_alt': (1.0, 10.0),    # around 5.0
+        'ki_alt': (1e-4, 1e-2),   # around 0.00061276
+        'kd_alt': (1.0, 20.0),    # around 8.59
+        'kp_att': (1.0, 3.0),     # around 1.95
+        'ki_att': (1e-4, 1e-3),   # around 0.000464
+        'kd_att': (0.1, 1.0)      # around 0.42447
+    }
+    
+    optimizer = BayesianOptimization(
+        f=objective,
+        pbounds=pbounds,
+        random_state=42,
+    )
+    
+    # Run the optimization: first with some random initial points then with iterations.
+    optimizer.maximize(
+        init_points=5,
+        n_iter=n_iter,
+    )
+    
+    print("Best parameters found:")
+    best = optimizer.max['params']
+
+    print("kp_yaw, ki_yaw, kd_yaw = 0.5, 1e-6, 0.1")
+    print("kp_pos, ki_pos, kd_pos = {:.5g}, {:.5g}, {:.5g}".format(
+        best['kp_pos'], best['ki_pos'], best['kd_pos']))
+    print("kp_alt, ki_alt, kd_alt = {:.5g}, {:.5g}, {:.5g}".format(
+        best['kp_alt'], best['ki_alt'], best['kd_alt']))
+    print("kp_att, ki_att, kd_att = {:.5g}, {:.5g}, {:.5g}".format(
+        best['kp_att'], best['ki_att'], best['kd_att']))
 
 if __name__ == "__main__":
-    # Define search space bounds for the 12 gain parameters.
-    # Adjust these bounds based on your system's requirements.
-    space = [
-        (0.00001, 20),   # kp_pos
-        (1e-10, 1e-1),  # ki_pos
-        (0.00001, 20),    # kd_pos
-        (0.00001, 20),    # kp_alt
-        (1e-10, 1e-1),  # ki_alt
-        (0.00001, 20),   # kd_alt
-        (0.00001, 20),   # kp_att
-        (1e-10, 1e-1),  # ki_att
-        (0.00001, 20),   # kd_att
-    ]
-
-    # Run Bayesian optimization with 100 evaluations (n_calls)
-    res = gp_minimize(objective, space, n_calls=n_calls, random_state=42)
-
-    print("Best gain parameters found:")
-    print(res.x)
-    print("Minimum cost:")
-    print(res.fun)
-
-    # Plot best costs over iterations
-    plt.plot(costs)
-    plt.xlabel("Iteration")
-    plt.ylabel("Cost")
-    plt.title("Cost over Iterations")
-    plt.show()
-
-
+    main()

@@ -1,17 +1,17 @@
 import numpy as np
 import time
-from mpl_toolkits.mplot3d import Axes3D  # Needed for 3D plotting
+from mpl_toolkits.mplot3d import Axes3D  # Required for 3D plotting
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 
-# --- PID Controller and Helper Functions ---
+# --- Utility Functions and PID Controller ---
 
 def wrap_angle(angle: float) -> float:
     """
-    Wrap an angle to the range [-pi, pi].
+    Wrap an angle in the range [-pi, pi].
 
     Parameters:
-        angle (float): Input angle in radians.
+        angle (float): Angle in radians.
 
     Returns:
         float: Wrapped angle in radians.
@@ -20,8 +20,8 @@ def wrap_angle(angle: float) -> float:
 
 def euler_to_rot(phi: float, theta: float, psi: float) -> np.ndarray:
     """
-    Convert Euler angles (roll=phi, pitch=theta, yaw=psi) to a rotation matrix.
-    Assumes a rotation order: Rz(psi) * Ry(theta) * Rx(phi).
+    Convert Euler angles (roll=phi, pitch=theta, yaw=psi) into a rotation matrix.
+    Assumes the rotation order Rz(psi) * Ry(theta) * Rx(phi).
 
     Parameters:
         phi (float): Roll angle in radians.
@@ -29,7 +29,7 @@ def euler_to_rot(phi: float, theta: float, psi: float) -> np.ndarray:
         psi (float): Yaw angle in radians.
 
     Returns:
-        np.ndarray: A 3x3 rotation matrix.
+        np.ndarray: 3x3 rotation matrix.
     """
     Rz = np.array([[np.cos(psi), -np.sin(psi), 0],
                    [np.sin(psi),  np.cos(psi), 0],
@@ -45,7 +45,7 @@ def euler_to_rot(phi: float, theta: float, psi: float) -> np.ndarray:
 class Controller:
     def __init__(self, kp: float, ki: float, kd: float):
         """
-        Initialize PID controller parameters.
+        Initialize the PID controller.
 
         Parameters:
             kp (float): Proportional gain.
@@ -63,12 +63,12 @@ class Controller:
         Compute the PID controller output.
 
         Parameters:
-            current_value (float): The current value.
-            target_value (float): The target value.
-            dt (float): Time step in seconds.
+            current_value (float): The current measurement.
+            target_value (float): The desired setpoint.
+            dt (float): Time step.
 
         Returns:
-            float: PID controller output.
+            float: Control output.
         """
         error = target_value - current_value
         self.integral += error * dt
@@ -90,15 +90,15 @@ class QuadCopterController:
         Initialize the quadcopter controller with PID controllers for position, altitude, attitude, and yaw.
 
         Parameters:
-            state (dict): Initial state of the quadcopter.
-            kp_pos, ki_pos, kd_pos (float): PID gains for x and y position.
-            kp_alt, ki_alt, kd_alt (float): PID gains for altitude (z).
-            kp_att, ki_att, kd_att (float): PID gains for roll & pitch.
+            state (dict): Current state of the drone.
+            kp_pos, ki_pos, kd_pos (float): PID gains for position.
+            kp_alt, ki_alt, kd_alt (float): PID gains for altitude.
+            kp_att, ki_att, kd_att (float): PID gains for attitude (roll & pitch).
             kp_yaw, ki_yaw, kd_yaw (float): PID gains for yaw.
             m (float): Mass of the drone.
             g (float): Gravitational acceleration.
-            b (float): Motor thrust coefficient.
-            u1_limit, u2_limit, u3_limit, u4_limit (float): Saturation limits for control commands.
+            b (float): Thrust coefficient.
+            u1_limit, u2_limit, u3_limit, u4_limit (float): Saturation limits for the control commands.
             max_angle_deg (float): Maximum tilt angle in degrees.
         """
         self.u1_limit = u1_limit
@@ -106,12 +106,12 @@ class QuadCopterController:
         self.u3_limit = u3_limit
         self.u4_limit = u4_limit
 
-        # PID controllers for position (x, y, z)
+        # PID for position (x, y, z)
         self.pid_x = Controller(kp_pos, ki_pos, kd_pos)
         self.pid_y = Controller(kp_pos, ki_pos, kd_pos)
         self.pid_z = Controller(kp_alt, ki_alt, kd_alt)
         
-        # PID controllers for attitude (roll & pitch) and separate PID for yaw
+        # PID for attitude (roll and pitch) and a separate PID for yaw
         self.pid_roll  = Controller(kp_att, ki_att, kd_att)
         self.pid_pitch = Controller(kp_att, ki_att, kd_att)
         self.pid_yaw   = Controller(kp_yaw, ki_yaw, kd_yaw)
@@ -124,12 +124,12 @@ class QuadCopterController:
 
     def update(self, state: dict, target: dict, dt: float) -> tuple:
         """
-        Compute control commands for the quadcopter.
+        Compute the control commands for the quadcopter.
 
         Parameters:
-            state (dict): Current state of the drone with keys 'pos' and 'angles'.
-            target (dict): Target position with keys 'x', 'y', 'z'.
-            dt (float): Time step in seconds.
+            state (dict): Current state of the drone.
+            target (dict): Target position with keys 'x', 'y', and 'z'.
+            dt (float): Time step.
 
         Returns:
             tuple: (thrust_command, roll_command, pitch_command, yaw_command)
@@ -138,7 +138,7 @@ class QuadCopterController:
         roll, pitch, yaw = state['angles']
         x_t, y_t, z_t = target['x'], target['y'], target['z']
 
-        # Outer loop: position control with hover feed-forward
+        # Outer loop: position control with feed-forward for hover
         compensation = np.clip(1.0 / (np.cos(pitch) * np.cos(roll)), 1.0, 1.5)
         hover_thrust = self.m * self.g * compensation
         pid_z_output = self.pid_z.update(z, z_t, dt)
@@ -147,7 +147,7 @@ class QuadCopterController:
         pitch_des = np.clip(self.pid_x.update(x, x_t, dt), -self.max_angle, self.max_angle)
         roll_des  = np.clip(-self.pid_y.update(y, y_t, dt), -self.max_angle, self.max_angle)
         
-        # Compute desired yaw from target position
+        # Compute desired yaw based on target position
         dx = target['x'] - x
         dy = target['y'] - y
         yaw_des = np.arctan2(dy, dx)
@@ -155,8 +155,7 @@ class QuadCopterController:
         # Inner loop: attitude control
         roll_command = self.pid_roll.update(roll, roll_des, dt)
         pitch_command = self.pid_pitch.update(pitch, pitch_des, dt)
-        # For yaw, you may choose to track the yaw_des value; here we use 0 as reference
-        yaw_command = self.pid_yaw.update(yaw, 0, dt)
+        yaw_command = self.pid_yaw.update(yaw, 0, dt)  # alternatively, use yaw_des
 
         # Saturate the commands
         thrust_command = np.clip(thrust_command, 0, self.u1_limit)
@@ -172,21 +171,21 @@ class QuadcopterModel:
                  init_state: dict, controller: QuadCopterController,
                  g: float = 9.81, max_rpm: float = 5000.0):
         """
-        Initialize the quadcopter model with physical parameters.
+        Initialize the physical model of the quadcopter.
 
         Parameters:
-            m (float): Mass of the drone.
-            I (np.ndarray): Moment of inertia (array of three values).
-            b (float): Motor thrust coefficient.
-            d (float): Drag torque coefficient.
-            l (float): Arm length of the drone.
-            Cd (np.ndarray): Drag coefficients for x, y, z.
-            Ca (np.ndarray): Rotational damping coefficients for roll, pitch, yaw.
+            m (float): Mass.
+            I (np.ndarray): Moment of inertia vector.
+            b (float): Thrust coefficient.
+            d (float): Drag coefficient.
+            l (float): Arm length.
+            Cd (np.ndarray): Translational drag coefficients.
+            Ca (np.ndarray): Rotational damping coefficients.
             Jr (float): Rotor inertia.
-            init_state (dict): Initial state of the drone.
-            controller (QuadCopterController): Controller instance for the drone.
+            init_state (dict): Initial state.
+            controller (QuadCopterController): Controller instance.
             g (float): Gravitational acceleration.
-            max_rpm (float): Maximum motor RPM.
+            max_rpm (float): Maximum RPM.
         """
         self.m = m
         self.I = I
@@ -206,19 +205,17 @@ class QuadcopterModel:
 
     def _compute_hover_rpm(self) -> None:
         """
-        Estimate the motor RPM required for hovering and print the result.
+        Compute the RPM value needed for hovering flight.
         """
         T_hover = self.m * self.g
         w_hover = np.sqrt(T_hover / (4 * self.b))
         rpm_hover = w_hover * 60.0 / (2.0 * np.pi)
-        #print(f"[INFO] Hover thrust needed = {T_hover:.2f} N, hover rpm per motor ~ {rpm_hover:.1f} rpm")
+        # Uncomment the following line for debug information:
+        # print(f"[INFO] Hover thrust needed = {T_hover:.2f} N, hover rpm per motor ~ {rpm_hover:.1f} rpm")
 
     def __str__(self) -> str:
         """
-        Return a string representation of the quadcopter state.
-
-        Returns:
-            str: String describing the current state.
+        Return a string representation of the quadcopter model.
         """
         return f"Quadcopter Model: state = {self.state}"
 
@@ -227,10 +224,10 @@ class QuadcopterModel:
         Compute the translational accelerations.
 
         Parameters:
-            state (dict): Current state of the drone.
+            state (dict): Current state.
 
         Returns:
-            np.ndarray: Accelerations [x_ddot, y_ddot, z_ddot].
+            np.ndarray: Acceleration vector [x_ddot, y_ddot, z_ddot].
         """
         omega = self._rpm_to_omega(state['rpm'])
         x_dot, y_dot, z_dot = state['vel']
@@ -265,10 +262,10 @@ class QuadcopterModel:
         Compute the rotational accelerations.
 
         Parameters:
-            state (dict): Current state of the drone.
+            state (dict): Current state.
 
         Returns:
-            np.ndarray: Angular accelerations [phi_ddot, theta_ddot, psi_ddot].
+            np.ndarray: Angular acceleration vector [phi_ddot, theta_ddot, psi_ddot].
         """
         omega = self._rpm_to_omega(state['rpm'])
         phi_dot, theta_dot, psi_dot = state['ang_vel']
@@ -294,28 +291,25 @@ class QuadcopterModel:
     
     def _rpm_to_omega(self, rpm: np.ndarray) -> np.ndarray:
         """
-        Convert motor RPM values to angular velocities (rad/s).
+        Convert motor RPM to angular velocity (rad/s).
 
         Parameters:
-            rpm (np.ndarray): Array of motor RPM values.
+            rpm (np.ndarray): Array of motor RPMs.
 
         Returns:
-            np.ndarray: Array of angular velocities in rad/s.
+            np.ndarray: Angular velocities in rad/s.
         """
         return rpm * 2 * np.pi / 60
     
     def _mixer(self, u1: float, u2: float, u3: float, u4: float) -> tuple:
         """
-        Compute individual motor RPM commands based on control inputs.
+        Compute the RPM for each motor based on the control inputs.
 
         Parameters:
-            u1 (float): Thrust command.
-            u2 (float): Roll command.
-            u3 (float): Pitch command.
-            u4 (float): Yaw command.
+            u1, u2, u3, u4 (float): Control inputs.
 
         Returns:
-            tuple: (rpm1, rpm2, rpm3, rpm4) motor commands.
+            tuple: RPM values for each motor.
         """
         b = self.b
         d = self.d
@@ -348,11 +342,11 @@ class QuadcopterModel:
         Perform one Runge-Kutta 4th order integration step.
 
         Parameters:
-            state (dict): Current state of the drone.
-            dt (float): Time step in seconds.
+            state (dict): Current state.
+            dt (float): Time step.
 
         Returns:
-            dict: New state after dt.
+            dict: New state after the integration step.
         """
         def f(s: dict) -> dict:
             return {
@@ -384,12 +378,13 @@ class QuadcopterModel:
 
     def update_state(self, state: dict, target: dict, dt: float) -> dict:
         """
-        Update the drone state by computing control commands, mixing motor RPMs, and integrating the dynamics.
+        Update the drone's state by computing control commands, mixing motor RPMs,
+        and integrating the dynamics.
 
         Parameters:
-            state (dict): Current state of the drone.
-            target (dict): Current target position.
-            dt (float): Time step in seconds.
+            state (dict): Current state.
+            target (dict): Target position with keys 'x', 'y', and 'z'.
+            dt (float): Time step.
 
         Returns:
             dict: Updated state.
@@ -401,45 +396,85 @@ class QuadcopterModel:
         state['angles'] = np.array([wrap_angle(a) for a in state['angles']])
         return state
 
-# --- Main Simulation and Plotting ---
+# --- Look-Ahead Target Function ---
+
+def compute_moving_target(drone_pos, seg_start, seg_end, v_des, k=1.0):
+    """
+    Compute the dynamic target point along a segment with a look-ahead distance of L = k*v_des.
+
+    Parameters:
+        drone_pos (np.array): Current drone position [x, y, z].
+        seg_start (np.array): Start point of the segment.
+        seg_end (np.array): End point of the segment.
+        v_des (float): Desired speed for this segment.
+        k (float): Scaling factor for the look-ahead distance.
+
+    Returns:
+        tuple: (target, progress) where target is the dynamic target point [x, y, z],
+               and progress is the fraction of the segment covered.
+    """
+    seg_vector = seg_end - seg_start
+    seg_length = np.linalg.norm(seg_vector)
+    if seg_length == 0:
+        return seg_end, 1.0
+    seg_dir = seg_vector / seg_length
+
+    # Project current position onto the segment
+    proj_length = np.dot(drone_pos - seg_start, seg_dir)
+    # Look-ahead distance
+    L = k * v_des
+    target_length = proj_length + L
+
+    # Do not exceed the final waypoint
+    if target_length > seg_length:
+        target_length = seg_length
+    target = seg_start + target_length * seg_dir
+    progress = target_length / seg_length
+    return target, progress
+
+# --- Main: Simulation and Plotting ---
 
 def main():
+    """
+    Run the drone simulation and plot the results.
+    The simulation stops early if the drone reaches the final target (within a 2-meter threshold).
+    """
     # Simulation parameters
-    dt: float = 0.007
-    simulation_time: float = 200.0
-    num_steps: int = int(simulation_time / dt)
-    frame_skip: int = 6
+    dt = 0.007
+    simulation_time = 200.0
+    num_steps = int(simulation_time / dt)
+    frame_skip = 8
+    threshold = 2.0  # Stop simulation if within 2 meters of final target
+    dynamic_target_shift_threshold_prc = 0.7 # Shift to next segment if a certain percentage of current segment is covered
 
-    # --- List of Flight Targets ---
-    # Define multiple targets; for example, first target: (100, 100, 40), second: (50, 85, 60),
-    # third: (80, 20, 10), and fourth: (0, 0, 0).
-    targets = [
-        {'x': 10.0, 'y': 10.0, 'z': 70.0},  # Start near origin but at high altitude (rapid ascent required)
-        {'x': 90.0, 'y': 10.0, 'z': 70.0},  # Far x, near y, maintaining high altitude (long horizontal flight)
-        {'x': 90.0, 'y': 90.0, 'z': 90.0},  # Far in both x and y with an even higher altitude (climb and diagonal flight)
-        {'x': 10.0, 'y': 90.0, 'z': 20.0},  # Sharp maneuver: near x, far y, with a dramatic altitude drop
-        {'x': 50.0, 'y': 50.0, 'z': 40.0},  # Central target with intermediate altitude (transition maneuver)
-        {'x': 60.0, 'y': 60.0, 'z': 40.0},  # Hovering target 1
-        {'x': 70.0, 'y': 70.0, 'z': 40.0},  # Gradual move to hovering target 2
-        {'x': 80.0, 'y': 80.0, 'z': 40.0},  # Gradual move to hovering target 3
-        {'x': 10.0, 'y': 10.0, 'z': 10.0}   # Final target: near origin at low altitude (drone must come to a near stop)
+    # --- Define Waypoints (with desired speed) ---
+    waypoints = [
+        {'x': 10.0, 'y': 10.0, 'z': 70.0, 'v': 10},  # Start near origin at high altitude
+        {'x': 90.0, 'y': 10.0, 'z': 70.0, 'v': 10},  # Far in x, near y, maintaining high altitude
+        {'x': 90.0, 'y': 90.0, 'z': 90.0, 'v': 0.5},   # Far in both x and y with even higher altitude
+        {'x': 10.0, 'y': 90.0, 'z': 20.0, 'v': 10},   # Sharp maneuver: near x, far y with dramatic altitude drop
+        {'x': 50.0, 'y': 50.0, 'z': 40.0, 'v': 10},   # Central target with intermediate altitude
+        {'x': 60.0, 'y': 60.0, 'z': 40.0, 'v': 10},   # Hovering target 1
+        {'x': 70.0, 'y': 70.0, 'z': 40.0, 'v': 10},   # Hovering target 2
+        {'x': 80.0, 'y': 80.0, 'z': 40.0, 'v': 10},   # Hovering target 3
+        {'x': 10.0, 'y': 10.0, 'z': 10.0, 'v': 10}    # Final target: near origin at low altitude
     ]
-    current_target_idx: int = 0
-    target = targets[current_target_idx]
 
-    # PID for position, altitude, attitude, and yaw
-    # kp_pos, ki_pos, kd_pos = 0.1, 1e-6, 0.5
-    # kp_alt, ki_alt, kd_alt = 2, 1e-5, 8
-    # kp_att, ki_att, kd_att = 0.05, 1e-6, 0.05
+    # Initial drone state
+    state = {
+        'pos': np.array([0.0, 0.0, 0.0]),
+        'vel': np.array([0.0, 0.0, 0.0]),
+        'angles': np.array([0.0, 0.0, 0.0]),
+        'ang_vel': np.array([0.0, 0.0, 0.0]),
+        'rpm': np.array([0.0, 0.0, 0.0, 0.0])
+    }
+    start_position = state['pos'].copy()
+
+    # PID controller settings (yaw gains remain fixed)
     kp_yaw, ki_yaw, kd_yaw = 0.5, 1e-6, 0.1
-
-    #kp_pos, ki_pos, kd_pos, kp_alt, ki_alt, kd_alt, \
-    # kp_att, ki_att, kd_att = 4.95, 0.000317, 7.74, 5.05, 6.27e-05, 9.313767570557587, 7.0, 0.00087, 1.248373550950162
-
-    kp_pos, ki_pos, kd_pos, kp_alt, ki_alt, kd_alt, \
-    kp_att, ki_att, kd_att = 0.05, 1e-07, 0.1, \
-        5.0, 0.0006127590885483034, 8.592641351266916, \
-    1.9490155153777726, 0.000463991370766884, 0.42446961785318355, \
+    kp_pos, ki_pos, kd_pos = 0.080397, 6.6749e-07, 0.18084
+    kp_alt, ki_alt, kd_alt = 6.4593, 0.00042035, 10.365
+    kp_att, ki_att, kd_att = 2.7805, 0.00045168, 0.36006
 
     # Drone physical parameters
     params = {
@@ -454,17 +489,7 @@ def main():
         'Jr': 6e-5
     }
 
-    # Initial state of the drone
-    state = {
-        'pos': np.array([0.0, 0.0, 0.0]),
-        'vel': np.array([0.0, 0.0, 0.0]),
-        'angles': np.array([0.0, 0.0, 0.0]),
-        'ang_vel': np.array([0.0, 0.0, 0.0]),
-        'rpm': np.array([0.0, 0.0, 0.0, 0.0])
-    }
-    start_position = state['pos'].copy()
-
-    # Initialize Controller and Model
+    # Initialize the quadcopter controller and model
     quad_controller = QuadCopterController(
         state, 
         kp_pos, ki_pos, kd_pos,     
@@ -489,31 +514,47 @@ def main():
         max_rpm=10000.0
     )
 
-    # --- Simulation Loop ---
+    # --- Initialize Dynamic Target Strategy ---
+    current_seg_idx = 0
+    seg_start = state['pos'].copy()
+    seg_end = np.array([waypoints[current_seg_idx]['x'], 
+                        waypoints[current_seg_idx]['y'], 
+                        waypoints[current_seg_idx]['z']])
+    v_des = waypoints[current_seg_idx]['v']
+    k_lookahead = 1.0  # Scaling parameter for look-ahead distance
+
+    # Lists for storing data for animation and plotting
     positions = []
     angles_history = []
     rpms_history = []
     time_history = []
     horiz_speed_history = []
     vertical_speed_history = []
-    target_reach_times = []  # Record simulation times when a target is reached
+    targets = []  # List to store the dynamic target
 
+    # Simulation loop
     for step in range(num_steps):
-        state = drone.update_state(state, target, dt)
+        # Compute dynamic target along the current segment
+        target_dynamic, progress = compute_moving_target(state['pos'], seg_start, seg_end, v_des, k=k_lookahead)
+        
+        # If progress on current segment is nearly complete, move to the next segment if available
+        if progress >= dynamic_target_shift_threshold_prc:
+            current_seg_idx += 1
+            if current_seg_idx < len(waypoints):
+                seg_start = seg_end
+                seg_end = np.array([waypoints[current_seg_idx]['x'], 
+                                    waypoints[current_seg_idx]['y'], 
+                                    waypoints[current_seg_idx]['z']])
+                v_des = waypoints[current_seg_idx]['v']
+                target_dynamic, progress = compute_moving_target(state['pos'], seg_start, seg_end, v_des, k=k_lookahead)
+            else:
+                target_dynamic = seg_end  # Final waypoint: fixed target
+        
+        # Update the drone state using the dynamic target
+        state = drone.update_state(state, {'x': target_dynamic[0], 'y': target_dynamic[1], 'z': target_dynamic[2]}, dt)
         current_time = step * dt
 
-        # Check if the drone has reached the current target within a 3 m error threshold
-        pos_error = np.linalg.norm(state['pos'] - np.array([target['x'], target['y'], target['z']]))
-        if pos_error < 0.5:
-            target_reach_times.append(current_time)
-            if current_target_idx < len(targets) - 1:
-                current_target_idx += 1
-                target = targets[current_target_idx]
-                print(f"Target reached at t={current_time:.2f}s. Switching to target: {target}")
-            else:
-                print(f"Final target reached at t={current_time:.2f}s within error threshold. Ending simulation early.")
-                break
-
+        # Save data every 'frame_skip' steps
         if step % frame_skip == 0:
             positions.append(state['pos'].copy())
             angles_history.append(state['angles'].copy())
@@ -521,6 +562,14 @@ def main():
             time_history.append(current_time)
             horiz_speed_history.append(np.linalg.norm(state['vel'][:2]))
             vertical_speed_history.append(state['vel'][2])
+            targets.append(target_dynamic.copy())
+
+        # Check if drone reached the final target (within threshold)
+
+        final_target = np.array([waypoints[-1]['x'], waypoints[-1]['y'], waypoints[-1]['z']])
+        if np.linalg.norm(state['pos'] - final_target) < threshold:
+            print(f"Final target reached at time: {current_time:.2f} s")
+            break
 
     positions = np.array(positions)
     angles_history = np.array(angles_history)
@@ -528,8 +577,9 @@ def main():
     time_history = np.array(time_history)
     horiz_speed_history = np.array(horiz_speed_history)
     vertical_speed_history = np.array(vertical_speed_history)
+    targets = np.array(targets)
 
-    # --- Animation Plot (3D Drone Trajectory & Status) ---
+    # --- Animation: 3D Trajectory of the Drone ---
     fig_anim = plt.figure(figsize=(10, 8))
     ax_anim = fig_anim.add_subplot(111, projection='3d')
     ax_anim.set_xlim(0, 100)
@@ -540,30 +590,33 @@ def main():
     ax_anim.set_zlabel('Z')
     ax_anim.set_title('Quadcopter Animation')
 
-    # Plot the trajectory line and current drone position
     trajectory_line, = ax_anim.plot([], [], [], 'b--', lw=2, label='Trajectory')
     drone_scatter = ax_anim.scatter([], [], [], color='red', s=50, label='Drone')
+    # Add a scatter for the dynamic target
+    target_scatter = ax_anim.scatter([], [], [], marker='*', color='magenta', s=100, label='Target')
+    
     time_text = ax_anim.text2D(0.05, 0.05, "", transform=ax_anim.transAxes, fontsize=10,
                                bbox=dict(facecolor='white', alpha=0.8))
-    current_quivers = []
-
-    # Mark starting point and target points
+    
+    # Display the starting point
     ax_anim.scatter(start_position[0], start_position[1], start_position[2],
                     marker='o', color='green', s=100, label='Start')
-    for i, tgt in enumerate(targets, start=1):
-        ax_anim.scatter(tgt['x'], tgt['y'], tgt['z'], marker='X', color='purple', s=100,
-                        label=f'Target {i}' if i == 1 else None)
-        ax_anim.text(tgt['x'], tgt['y'], tgt['z'] + 2, f'{i}', color='black', fontsize=12, ha='center')
+    # Display waypoints
+    for i, wp in enumerate(waypoints, start=1):
+        ax_anim.scatter(wp['x'], wp['y'], wp['z'], marker='X', color='purple', s=100,
+                        label=f'Waypoint {i}' if i == 1 else None)
+        ax_anim.text(wp['x'], wp['y'], wp['z'] + 2, f'{i}', color='black', fontsize=12, ha='center')
 
     def init_anim():
         trajectory_line.set_data([], [])
         trajectory_line.set_3d_properties([])
         drone_scatter._offsets3d = ([], [], [])
+        target_scatter._offsets3d = ([], [], [])
         time_text.set_text("")
-        return trajectory_line, drone_scatter, time_text
+        return trajectory_line, drone_scatter, target_scatter, time_text
 
     def update_anim(frame):
-        nonlocal current_quivers
+        nonlocal targets
         xdata = positions[:frame, 0]
         ydata = positions[:frame, 1]
         zdata = positions[:frame, 2]
@@ -572,8 +625,12 @@ def main():
 
         pos = positions[frame]
         drone_scatter._offsets3d = ([pos[0]], [pos[1]], [pos[2]])
+        
+        # Update the dynamic target marker
+        targ = targets[frame]
+        target_scatter._offsets3d = ([targ[0]], [targ[1]], [targ[2]])
 
-        # Remove previous quivers
+        # Update the arrows indicating the drone's attitude
         for q in current_quivers:
             q.remove()
         current_quivers.clear()
@@ -598,73 +655,52 @@ def main():
         current_time = frame * dt * frame_skip
         current_rpm = rpms_history[frame]
         text_str = (f"Time: {current_time:.2f} s\n"
-                    f"RPM: [{current_rpm[0]:.2f}, {current_rpm[1]:.2f}, "
-                    f"{current_rpm[2]:.2f}, {current_rpm[3]:.2f}]\n"
+                    f"RPM: [{current_rpm[0]:.2f}, {current_rpm[1]:.2f}, {current_rpm[2]:.2f}, {current_rpm[3]:.2f}]\n"
                     f"Vertical Speed: {vertical_speed_history[frame]:.2f} m/s\n"
-                    f"Horiz Speed: {horiz_speed_history[frame]:.2f} m/s\n"
+                    f"Horizontal Speed: {horiz_speed_history[frame]:.2f} m/s\n"
                     f"Pitch: {angles_history[frame][0]:.4f} rad\n"
                     f"Roll: {angles_history[frame][1]:.4f} rad\n"
                     f"Yaw: {angles_history[frame][2]:.4f} rad")
         time_text.set_text(text_str)
 
-        return trajectory_line, drone_scatter, time_text, *current_quivers
+        return trajectory_line, drone_scatter, target_scatter, time_text, *current_quivers
+
+    # List to manage attitude arrow objects
+    current_quivers = []
 
     ani = animation.FuncAnimation(fig_anim, update_anim, frames=len(positions),
                                   init_func=init_anim, interval=50, blit=False, repeat=True)
-    plt.show()  # Close animation window to continue
+    plt.show()
 
-    # --- Post-Simulation Plots (Positions, Attitude, RPMs, Speeds) ---
-
+    # --- Post-Simulation Plots (Positions, Attitude, RPM, Speeds) ---
     fig, axs = plt.subplots(3, 2, figsize=(14, 10))
     
-    # Build time segments based on target reach times.
-    # seg_times: list of times [0, t1, t2, ..., t_end]
-    t_end = time_history[-1]
-    seg_times = [0.0] + target_reach_times[:]
-    if seg_times[-1] < t_end:
-        seg_times.append(t_end)
-    segments = []
-    # Each segment is active with the target that was current during that segment.
-    for i in range(len(seg_times) - 1):
-        # Use target index i if available; if i exceeds available targets, use the last target.
-        tgt_idx = i if i < len(targets) else len(targets) - 1
-        segments.append((seg_times[i], seg_times[i+1], targets[tgt_idx]))
-    
-    # X Position Plot
+    # X Position
     axs[0, 0].plot(time_history, positions[:, 0], label='X Position')
-    for i, seg in enumerate(segments):
-        axs[0, 0].hlines(y=seg[2]['x'], xmin=seg[0], xmax=seg[1], colors='r', 
-                         linestyles='--', label='Target X' if i == 0 else None)
-    for t in target_reach_times:
-        axs[0, 0].axvline(x=t, color='k', linestyle='--')
+    for wp in waypoints:
+        axs[0, 0].axhline(y=wp['x'], linestyle='--', color='r', label='Waypoint X' if wp == waypoints[0] else None)
     axs[0, 0].set_title('X Position')
     axs[0, 0].set_ylabel('X (m)')
     axs[0, 0].legend()
     
-    # Y Position Plot
+    # Y Position
     axs[1, 0].plot(time_history, positions[:, 1], label='Y Position')
-    for i, seg in enumerate(segments):
-        axs[1, 0].hlines(y=seg[2]['y'], xmin=seg[0], xmax=seg[1], colors='r', 
-                         linestyles='--', label='Target Y' if i == 0 else None)
-    for t in target_reach_times:
-        axs[1, 0].axvline(x=t, color='k', linestyle='--')
+    for wp in waypoints:
+        axs[1, 0].axhline(y=wp['y'], linestyle='--', color='r', label='Waypoint Y' if wp == waypoints[0] else None)
     axs[1, 0].set_title('Y Position')
     axs[1, 0].set_ylabel('Y (m)')
     axs[1, 0].legend()
     
-    # Z Position Plot
+    # Z Position
     axs[2, 0].plot(time_history, positions[:, 2], label='Z Position')
-    for i, seg in enumerate(segments):
-        axs[2, 0].hlines(y=seg[2]['z'], xmin=seg[0], xmax=seg[1], colors='r', 
-                         linestyles='--', label='Target Z' if i == 0 else None)
-    for t in target_reach_times:
-        axs[2, 0].axvline(x=t, color='k', linestyle='--')
+    for wp in waypoints:
+        axs[2, 0].axhline(y=wp['z'], linestyle='--', color='r', label='Waypoint Z' if wp == waypoints[0] else None)
     axs[2, 0].set_title('Z Position')
     axs[2, 0].set_ylabel('Z (m)')
     axs[2, 0].set_xlabel('Time (s)')
     axs[2, 0].legend()
     
-    # Attitude Plot (Pitch, Roll, Yaw)
+    # Attitude: Pitch, Roll, Yaw
     axs[0, 1].plot(time_history, angles_history[:, 0], label='Pitch')
     axs[0, 1].plot(time_history, angles_history[:, 1], label='Roll')
     axs[0, 1].plot(time_history, angles_history[:, 2], label='Yaw')
@@ -672,7 +708,7 @@ def main():
     axs[0, 1].set_ylabel('Angle (rad)')
     axs[0, 1].legend()
     
-    # Motor RPMs Plot
+    # Motor RPMs
     axs[1, 1].plot(time_history, rpms_history[:, 0], label='RPM1')
     axs[1, 1].plot(time_history, rpms_history[:, 1], label='RPM2')
     axs[1, 1].plot(time_history, rpms_history[:, 2], label='RPM3')
@@ -681,13 +717,9 @@ def main():
     axs[1, 1].set_ylabel('RPM')
     axs[1, 1].legend()
     
-    # Speeds Plot (Horizontal & Vertical)
+    # Speeds: Horizontal and Vertical
     axs[2, 1].plot(time_history, horiz_speed_history, label='Horizontal Speed', color='r')
     axs[2, 1].plot(time_history, vertical_speed_history, label='Vertical Speed', color='g')
-    axs[2, 1].hlines(np.mean(horiz_speed_history), time_history[0], time_history[-1],
-                    label=f'Avg Horiz Speed: {np.mean(horiz_speed_history):.2f} m/s', colors='r', linestyles='--')
-    axs[2, 1].hlines(np.mean(vertical_speed_history), time_history[0], time_history[-1],
-                    label=f'Avg Vert Speed: {np.mean(abs(vertical_speed_history)):.2f} m/s', colors='g', linestyles='--')
     axs[2, 1].set_title('Speeds')
     axs[2, 1].set_ylabel('Speed (m/s)')
     axs[2, 1].set_xlabel('Time (s)')
